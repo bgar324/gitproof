@@ -1,0 +1,192 @@
+GitProof – Full Comprehensive Breakdown
+❖ Overview
+GitProof is a developer-facing analytics platform that transforms a GitHub account into a recruiter-ready report. It bridges the gap between real work and recognized credibility by auto-parsing public repositories, READMEs, commit histories, and stack usage to generate clear, structured, and exportable proof-of-work.
+
+❖ Core Purpose
+Developers build. Recruiters skim.
+GitProof translates developer work into recruiter-readable, résumé-grade signal.
+
+❖ User Value Proposition
+Auth with GitHub
+
+Select which repos to analyze
+
+Parse project stack, role, commit rhythm, README quality
+
+Auto-generate résumé bullets and recruiter-optimized report
+
+Export as PDF or share public GitProof profile
+
+❖ Primary Use Cases
+Audience	Use Case
+Job-seeking devs	Add GitProof PDF to résumé or LinkedIn
+Bootcamp grads	Showcase portfolio with GPT-enhanced summaries
+Recruiters	Quickly assess candidate capabilities
+Portfolio builders	Link GitProof page as proof-of-skill
+
+❖ Top-Level Features
+1. GitHub Integration
+GitHub OAuth (auth + access token)
+
+Repo selection UI with omit toggle
+
+Public profile scraping if user not authenticated
+
+2. Parsing Engine
+Repo metadata: stars, forks, last commit
+
+README decoding and NLP parsing
+
+Language usage analysis
+
+Commit history trends (weekly, total)
+
+3. Inferred Stack Breakdown
+Language % (e.g. JS 45%, Python 30%)
+
+Role classification: frontend, backend, fullstack, infra, ML, CLI
+
+Dependency file parsing (package.json, requirements.txt)
+
+4. README Analyzer
+Structure quality: headers, sections, instructions
+
+Word count, presence of setup info
+
+GPT-enhanced résumé bullets (for top 3–5 repos)
+
+README linter score (optional)
+
+5. Report Generation
+Visual dashboard (frontend view)
+
+Exportable PDF:
+
+Stack summary
+
+Top 3–5 projects (title, bullets, stack tags)
+
+README quality
+
+Commit heatmap
+
+Résumé-ready format
+
+6. Public Profile
+/gitproof/benjamin style page
+
+Mobile-friendly summary view
+
+Recruiter share mode (PDF + links only)
+
+7. Refresh Logic + Caching
+Refresh cooldown (24h or manual trigger)
+
+Redis + Postgres store parsed data
+
+Delta fetch on refresh (updated repos only)
+
+❖ Tech Stack
+Frontend
+Next.js (App Router) – structure, routing, SSR
+
+Tailwind CSS – utility-first styling
+
+Framer Motion – animations and transitions
+
+Recharts – visualizing commit patterns, stack breakdown
+
+Zustand – lightweight state management
+
+NextAuth.js – GitHub OAuth handling
+
+Backend
+FastAPI – async backend, typed routes
+
+Celery – task queue for heavy GitHub parsing jobs
+
+Redis – job broker + refresh throttling
+
+PostgreSQL – persistent storage of users, repos, analytics
+
+OpenAI API – résumé bullet generation from READMEs
+
+PyGitHub – GitHub API wrapper
+
+Docker – containerization of all services
+
+Infrastructure
+Vercel – frontend + Next.js hosting
+
+Render / Railway – backend + Celery worker hosting
+
+Supabase Storage / S3 – storing generated PDFs
+
+Sentry – error monitoring
+
+Plausible – privacy-first analytics
+
+❖ User Flow
+plaintext
+Copy
+Edit
+1. User logs in with GitHub OAuth
+2. Select repos (or default to all public)
+3. Task enqueued to Celery → Redis queue
+4. Celery fetches GitHub data, parses + scores
+5. Data saved to DB
+6. Frontend polls for task status
+7. Final report rendered + PDF ready
+8. Optional: public profile published
+❖ Scaling Plan
+Each user brings their own GitHub token → 5000 API calls/hour
+
+Redis queue decouples parsing load
+
+Celery workers scale horizontally
+
+PDF rendering capped to top N repos to control cost/time
+
+GPT usage optional or gated (premium feature or capped usage)
+
+❖ Planned Features
+Recruiter dashboard view (bulk scans)
+
+Custom README templates (for users to improve output)
+
+GitHub App upgrade (vs OAuth)
+
+“GitProof Score” as public badge (e.g. LinkedIn embed)
+
+Open-source CLI version for self-hosted GitProof reports
+
+Skill graph across time (year-over-year stack evolution)
+
+❖ Open Source Philosophy
+Parsing engine + PDF layout open source (MIT)
+
+Core GitHub fetch logic transparent
+
+OpenAI résumé layer optional (non-critical path)
+
+Encourage community-contributed bullet generators and report styles
+
+Devs can self-host GitProof and generate local reports for free
+
+❖ Tagline Options
+"Proof of work, without the guesswork."
+"Your GitHub, recruiter-ready."
+"The résumé layer for developers."
+"Turn your GitHub into signal."
+
+GitProof is the missing translator between your work and your worth.
+And every dev needs it.
+
+
+chunk 3: ai Features
+- ai interpretation on the type of developer they are based on common technologies used, as well as their level of experience through how old their github is. include skill evolution, so like. "Python and HTML heavy in 2022, transitioned to React in 2024"
+
+- ai advise as to which to showcase for recruiters and the gitproof PDF
+
+- based on readme length for each repo, toggle an icon that just says that your read me is too short, generate ai suggested read me? (first part isnt really ai, but the latter is)
+

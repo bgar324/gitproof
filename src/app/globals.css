@@ -1,26 +1,203 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --card-background: #ffffff;
+  --border-color: #e5e7eb;
+  --hover-bg: #f7f7f8;
+  --sidebar-width: 16rem;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: var(--font-geist-mono);
+  --font-reckless: 'Reckless', Georgia, serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
   }
 }
 
-body {
-  background: var(--background);
+/* Reckless Light */
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-LightItalic.woff2') format('woff2');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Reckless Regular */
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-RegularItalic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Reckless Medium */
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-MediumItalic.woff2') format('woff2');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Reckless SemiBold */
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-SemiBoldItalic.woff2') format('woff2');
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Reckless Bold */
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Reckless';
+  src: url('/fonts/font_reckless/RecklessNeue-BoldItalic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@layer utilities {
+  .font-reckless {
+    font-family: var(--font-reckless);
+    font-variation-settings: 'wght' 400;
+  }
+  
+  .font-reckless-light {
+    font-family: var(--font-reckless);
+    font-variation-settings: 'wght' 300;
+  }
+  
+  .font-reckless-medium {
+    font-family: var(--font-reckless);
+    font-variation-settings: 'wght' 500;
+  }
+  
+  .font-reckless-semibold {
+    font-family: var(--font-reckless);
+    font-variation-settings: 'wght' 600;
+  }
+  
+  .font-reckless-bold {
+    font-family: var(--font-reckless);
+    font-variation-settings: 'wght' 700;
+  }
+  
+  .font-reckless-italic {
+    font-style: italic;
+  }
+  
+  .notion-card {
+    background-color: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    transition-property: box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+}
+
+.notion-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.notion-card:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar {
+  width: 240px;
+  background-color: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.main-content {
+  flex: 1;
+  padding: 2rem;
+  background-color: #ffffff;
+  overflow-y: auto;
+}
+
+.tech-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--hover-bg);
+  border: 1px solid var(--border-color);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.readme-preview {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background: var(--card-background);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  margin-top: 1rem;
 }
