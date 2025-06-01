@@ -191,7 +191,7 @@ export default function AiInsights({ repos, languages, commitActivity, createdAt
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-2 gap-6">
         {/* Developer Insights Card */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
           {renderInsight('developer', 'Developer Insights', insights.developer)}
