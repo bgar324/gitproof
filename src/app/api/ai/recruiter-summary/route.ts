@@ -1,15 +1,18 @@
-import { getServerSession } from 'next-auth'
-import { NextResponse } from 'next/server'
-import { authOptions } from '../../auth/[...nextauth]/route'
-import { getAiSummary } from '@/lib/gemini'
-import { Octokit } from '@octokit/rest'
-import { getDetailedRepoMetrics, aggregateLanguagesByYear } from '@/lib/github-metrics'
+import { getServerSession } from "next-auth";
+import { NextResponse } from "next/server";
+import { authOptions } from "../../auth/[...nextauth]/route";
+import { getAiSummary } from "@/lib/gemini";
+import { Octokit } from "@octokit/rest";
+import {
+  getDetailedRepoMetrics,
+  aggregateLanguagesByYear,
+} from "@/lib/github-metrics";
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions)
+  const session = await getServerSession(authOptions);
 
   if (!session?.accessToken) {
-    return new Response('Unauthorized', { status: 401 })
+    return new Response("Unauthorized", { status: 401 });
   }
 
   try {
@@ -32,56 +35,70 @@ export async function POST(request: Request) {
     // Calculate aggregate metrics
     const totalRepos = repoDetails.length;
     const multiContributorRepos = repoDetails.filter(
-      r => r.collaboration_metrics.total_contributors > 1
+      (r) => r.collaboration_metrics.total_contributors > 1
     ).length;
     const totalCommits = repoDetails.reduce(
-      (sum, r) => sum + r.commit_metrics.total_commits, 0
+      (sum, r) => sum + r.commit_metrics.total_commits,
+      0
     );
     const longestStreak = Math.max(
-      ...repoDetails.map(r => r.commit_metrics.longest_streak_days)
+      ...repoDetails.map((r) => r.commit_metrics.longest_streak_days)
     );
     const totalPRs = repoDetails.reduce(
-      (sum, r) => sum + r.collaboration_metrics.total_prs, 0
+      (sum, r) => sum + r.collaboration_metrics.total_prs,
+      0
     );
     const mergedPRs = repoDetails.reduce(
-      (sum, r) => sum + r.collaboration_metrics.merged_prs, 0
+      (sum, r) => sum + r.collaboration_metrics.merged_prs,
+      0
     );
     const reposWithTests = repoDetails.filter(
-      r => r.code_quality.has_tests
+      (r) => r.code_quality.has_tests
     ).length;
-    const reposWithCI = repoDetails.filter(
-      r => r.code_quality.has_ci
-    ).length;
+    const reposWithCI = repoDetails.filter((r) => r.code_quality.has_ci).length;
 
     // Find most significant repositories based on metrics
     const significantRepos = repoDetails
-      .map(repo => ({
+      .map((repo) => ({
         ...repo,
-        score: (
-          (repo.stars * 2) +
-          (repo.forks * 3) +
-          (repo.commit_metrics.total_commits * 0.1) +
-          (repo.collaboration_metrics.total_contributors * 5) +
+        score:
+          repo.stars * 2 +
+          repo.forks * 3 +
+          repo.commit_metrics.total_commits * 0.1 +
+          repo.collaboration_metrics.total_contributors * 5 +
           (repo.code_quality.has_tests ? 10 : 0) +
           (repo.code_quality.has_ci ? 10 : 0) +
-          (repo.readme_metrics.word_count > 300 ? 5 : 0)
-        )
+          (repo.readme_metrics.word_count > 300 ? 5 : 0),
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
 
     // Calculate documentation quality metrics
-    const reposWithReadme = repoDetails.filter(r => r.readme_metrics !== null).length;
-    const avgReadmeScore = repoDetails.reduce(
-      (sum, r) => sum + (r.readme_metrics?.overall_score || 0), 0
-    ) / repoDetails.length;
+    const reposWithReadme = repoDetails.filter(
+      (r) => r.readme_metrics !== null
+    ).length;
+    const avgReadmeScore =
+      repoDetails.reduce(
+        (sum, r) => sum + (r.readme_metrics?.overall_score || 0),
+        0
+      ) / repoDetails.length;
 
     const readmeQualityBreakdown = {
-      installation: repoDetails.filter(r => r.readme_metrics?.critical_sections.installation).length,
-      usage: repoDetails.filter(r => r.readme_metrics?.critical_sections.usage).length,
-      contribution: repoDetails.filter(r => r.readme_metrics?.critical_sections.contribution).length,
-      api_docs: repoDetails.filter(r => r.readme_metrics?.quality_signals.has_api_docs).length,
-      examples: repoDetails.filter(r => r.readme_metrics?.quality_signals.has_examples).length
+      installation: repoDetails.filter(
+        (r) => r.readme_metrics?.critical_sections.installation
+      ).length,
+      usage: repoDetails.filter(
+        (r) => r.readme_metrics?.critical_sections.usage
+      ).length,
+      contribution: repoDetails.filter(
+        (r) => r.readme_metrics?.critical_sections.contribution
+      ).length,
+      api_docs: repoDetails.filter(
+        (r) => r.readme_metrics?.quality_signals.has_api_docs
+      ).length,
+      examples: repoDetails.filter(
+        (r) => r.readme_metrics?.quality_signals.has_examples
+      ).length,
     };
 
     // Construct the prompt for AI analysis
@@ -99,21 +116,33 @@ export async function POST(request: Request) {
       - Repos with CI: ${reposWithCI}
 
       Top 3 Most Significant Repositories:
-      ${significantRepos.map(repo => `
+      ${significantRepos
+        .map(
+          (repo) => `
         ${repo.name}:
         - Description: ${repo.description}
         - Stars: ${repo.stars}
         - Forks: ${repo.forks}
         - Contributors: ${repo.collaboration_metrics.total_contributors}
-        - Documentation Score: ${repo.readme_metrics?.overall_score.toFixed(1) || 'N/A'}/100
+        - Documentation Score: ${
+          repo.readme_metrics?.overall_score.toFixed(1) || "N/A"
+        }/100
         - Documentation Highlights: ${[
-          repo.readme_metrics?.critical_sections.installation ? 'Setup Guide' : '',
-          repo.readme_metrics?.critical_sections.usage ? 'Usage Docs' : '',
-          repo.readme_metrics?.critical_sections.architecture ? 'Architecture' : '',
-          repo.readme_metrics?.quality_signals.has_api_docs ? 'API Docs' : '',
-          repo.readme_metrics?.quality_signals.has_examples ? 'Examples' : ''
-        ].filter(Boolean).join(', ')}
-      `).join('')}
+          repo.readme_metrics?.critical_sections.installation
+            ? "Setup Guide"
+            : "",
+          repo.readme_metrics?.critical_sections.usage ? "Usage Docs" : "",
+          repo.readme_metrics?.critical_sections.architecture
+            ? "Architecture"
+            : "",
+          repo.readme_metrics?.quality_signals.has_api_docs ? "API Docs" : "",
+          repo.readme_metrics?.quality_signals.has_examples ? "Examples" : "",
+        ]
+          .filter(Boolean)
+          .join(", ")}
+      `
+        )
+        .join("")}
 
       Documentation Quality Analysis:
       - Overall Documentation Score: ${avgReadmeScore.toFixed(1)}/100
@@ -128,12 +157,14 @@ export async function POST(request: Request) {
       Technology Evolution:
       ${Object.entries(yearlyLanguages)
         .sort(([a], [b]) => Number(b) - Number(a))
-        .map(([year, langs]) =>
-          `${year}: ${Object.entries(langs)
-            .sort(([,a], [,b]) => b - a)
-            .map(([lang]) => lang)
-            .join(', ')}`
-        ).join('\n')}
+        .map(
+          ([year, langs]) =>
+            `${year}: ${Object.entries(langs)
+              .sort(([, a], [, b]) => b - a)
+              .map(([lang]) => lang)
+              .join(", ")}`
+        )
+        .join("\n")}
 
       Provide a comprehensive profile summary that includes:
       1. Technical expertise and progression based on the yearly language evolution
@@ -147,15 +178,18 @@ export async function POST(request: Request) {
       Output in a neutral, third-person style suitable for a professional profile. Focus on concrete metrics and observable patterns.
     `;
 
-    const analysis = await getAiSummary(prompt, `recruiter-${session.user?.name || 'anonymous'}`)
+    const analysis = await getAiSummary(
+      prompt,
+      `recruiter-${session.user?.name || "anonymous"}`
+    );
     return new NextResponse(JSON.stringify({ analysis }), {
-      headers: { 'Content-Type': 'application/json' }
-    })
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error: any) {
-    console.error('Error in recruiter analysis:', error)
+    console.error("Error in recruiter analysis:", error);
     return new NextResponse(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

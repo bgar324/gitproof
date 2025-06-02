@@ -1,4 +1,5 @@
-import { GitHubRepo, GitHubUser } from "@/app/types";
+// import { GitHubRepo, GitHubUser } from "@/app/types";
+import { GitHubRepo, GitHubOwner } from "../types/github";
 
 // Get GitHub stats for a user
 export const getGitHubStats = async (accessToken: string) => {
@@ -17,7 +18,7 @@ export const getGitHubStats = async (accessToken: string) => {
 };
 
 // Analyze repositories using AI
-export const analyzeRepositories = async (repos: GitHubRepo[], user: GitHubUser) => {
+export const analyzeRepositories = async (repos: GitHubRepo[], user: GitHubOwner) => {
   // In a real implementation, this would call your AI service
   // For now, we'll return mock data
   return {
