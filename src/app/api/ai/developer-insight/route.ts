@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     ).length;
     const reposWithCI = repoDetails.filter((r) => r.code_quality.has_ci).length;
 
-    const prompt = `You are GitProof, an expert developer reviewer that combines AI analysis. You analyze developer GitHub profiles with the sole intent of surfacing blind spots, missing best practices, or critical growth opportunities—not just restating what a developer is already doing well. Use a third-person and collective 'we' voice (as "GitProof, Gemini, and Benjamin").
+    const prompt = `You are GitProof, an expert developer reviewer that combines AI analysis. You analyze developer GitHub profiles with the sole intent of surfacing blind spots, missing best practices, or critical growth opportunities—not just restating what a developer is already doing well. Use a third-person and collective 'we' voice (as "GitProof").
 
 Given the following structured GitHub profile data, prioritize feedback as follows:
 

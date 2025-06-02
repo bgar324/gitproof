@@ -8,15 +8,9 @@ if (!process.env.GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY is not set in environment variables.");
 }
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const aiSummaryCache: Record<string, string> = {}
 
-export async function getAiSummary(prompt: string, cacheKey: string): Promise<string> {
-  if (aiSummaryCache[cacheKey]) {
-    console.log("GEMINI_LIB: Cache hit for key:", cacheKey)
-    return aiSummaryCache[cacheKey]
-  }
-
-  console.log("GEMINI_LIB: Cache miss, generating summary (prompt snippet):", prompt.substring(0, 100) + "...")
+export async function getAiSummary(prompt: string, userId?: string): Promise<string> {
+  console.log("GEMINI_LIB: Generating summary (prompt snippet):", prompt.substring(0, 100) + "...");
 
   try {
     const model = genAI.getGenerativeModel({
@@ -27,8 +21,7 @@ export async function getAiSummary(prompt: string, cacheKey: string): Promise<st
     const response = result.response;
     const text = response.text();
 
-    aiSummaryCache[cacheKey] = text
-    console.log("GEMINI_LIB: Generated and cached summary (snippet):", text.substring(0, 100) + "...")
+    console.log("GEMINI_LIB: Generated summary (snippet):", text.substring(0, 100) + "...");
     return text;
   } catch (error: any) {
     console.error("GEMINI_LIB: Error during Gemini API call:", error);

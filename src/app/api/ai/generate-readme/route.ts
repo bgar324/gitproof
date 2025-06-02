@@ -52,9 +52,13 @@ ${body.features?.length ? `## Features\n${body.features.map(f => `- ${f}`).join(
 ${body.contributing ? `## Contributing\n${body.contributing}\n` : ''}
 ${body.license ? `## License\n${body.license}\n` : ''}`;
 
-    const readmeContent = await getAiSummary(prompt, 'generate-readme');
+    console.log('Generating README with prompt:', prompt);
+    const readmeContent = await getAiSummary(prompt);
     
-    return NextResponse.json({ readme: readmeContent });
+    return NextResponse.json({ 
+      readme: readmeContent,
+      generatedAt: new Date().toISOString()
+    });
   } catch (error: any) {
     console.error('Error generating README:', error);
     return NextResponse.json(

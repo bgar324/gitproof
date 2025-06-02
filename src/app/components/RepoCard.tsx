@@ -11,32 +11,32 @@ import { FiAlertTriangle } from "react-icons/fi";
 
 // Function to generate a consistent color based on language name
 const getLanguageColor = (language: string | null): string => {
-  if (!language) return '#94a3b8'; // Default gray color for unknown languages
-  
+  if (!language) return "#94a3b8"; // Default gray color for unknown languages
+
   // Common languages with their GitHub colors
   const languageColors: Record<string, string> = {
-    'JavaScript': '#f1e05a',
-    'TypeScript': '#3178c6',
-    'Python': '#3572A5',
-    'Java': '#b07219',
-    'C++': '#f34b7d',
-    'C#': '#178600',
-    'PHP': '#4F5D95',
-    'Ruby': '#701516',
-    'Go': '#00ADD8',
-    'Rust': '#dea584',
-    'Swift': '#F05138',
-    'Kotlin': '#A97BFF',
-    'HTML': '#e34c26',
-    'CSS': '#563d7c',
-    'SCSS': '#c6538c',
-    'Shell': '#89e051',
-    'Dockerfile': '#384d54',
-    'Makefile': '#427819',
-    'Vue': '#41b883',
-    'React': '#61dafb',
-    'Angular': '#dd0031',
-    'Svelte': '#ff3e00',
+    JavaScript: "#f1e05a",
+    TypeScript: "#3178c6",
+    Python: "#3572A5",
+    Java: "#b07219",
+    "C++": "#f34b7d",
+    "C#": "#178600",
+    PHP: "#4F5D95",
+    Ruby: "#701516",
+    Go: "#00ADD8",
+    Rust: "#dea584",
+    Swift: "#F05138",
+    Kotlin: "#A97BFF",
+    HTML: "#e34c26",
+    CSS: "#563d7c",
+    SCSS: "#c6538c",
+    Shell: "#89e051",
+    Dockerfile: "#384d54",
+    Makefile: "#427819",
+    Vue: "#41b883",
+    React: "#61dafb",
+    Angular: "#dd0031",
+    Svelte: "#ff3e00",
   };
 
   // If we have a defined color, use it
@@ -49,7 +49,7 @@ const getLanguageColor = (language: string | null): string => {
   for (let i = 0; i < language.length; i++) {
     hash = language.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   // Generate a pastel color using HSL
   const h = Math.abs(hash) % 360;
   return `hsl(${h}, 70%, 65%)`;
@@ -92,10 +92,14 @@ interface LanguageStats {
 
 export default function RepoCard({ repo, session }: RepoCardProps) {
   if (!session?.accessToken) return null;
-  
+
   const [aiSummary, setAiSummary] = useState<string>("");
   const [isReadmeLoading, setIsReadmeLoading] = useState(false);
   const [readmeContent, setReadmeContent] = useState<string | null>(null);
+  const [isReadmePreviewOpen, setIsReadmePreviewOpen] = useState(false);
+  const wordCount = readmeContent ? readmeContent.split(/\s+/).length : 0;
+  const charCount = readmeContent ? readmeContent.length : 0;
+  const isReadmeTooShort = charCount < 100; // Flag for READMEs under 100 characters
   const [languages, setLanguages] = useState<Record<string, number>>({});
   const [isLoadingLanguages, setIsLoadingLanguages] = useState<boolean>(false);
   const [isLoadingAiSummary, setIsLoadingAiSummary] = useState<boolean>(false);
@@ -104,7 +108,7 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
   useEffect(() => {
     const fetchRepoData = async () => {
       if (!session?.accessToken) return;
-      
+
       setIsReadmeLoading(true);
       setIsLoadingLanguages(true);
       try {
@@ -115,7 +119,7 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
             {
               headers: {
                 Authorization: `token ${session.accessToken}`,
-                Accept: 'application/vnd.github.v3+json',
+                Accept: "application/vnd.github.v3+json",
               },
             }
           ),
@@ -124,10 +128,10 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
             {
               headers: {
                 Authorization: `token ${session.accessToken}`,
-                Accept: 'application/vnd.github.v3+json',
+                Accept: "application/vnd.github.v3+json",
               },
             }
-          )
+          ),
         ]);
 
         if (readmeResponse.ok) {
@@ -141,7 +145,7 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
           setLanguages(languagesData);
         }
       } catch (error) {
-        console.error('Error fetching repository data:', error);
+        console.error("Error fetching repository data:", error);
         setReadmeContent(null);
       } finally {
         setIsReadmeLoading(false);
@@ -153,18 +157,21 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
   }, [repo, session?.accessToken]);
 
   // Get top 3 languages with their percentages
-  const getTopLanguages = (): {name: string, percent: number}[] => {
+  const getTopLanguages = (): { name: string; percent: number }[] => {
     if (Object.keys(languages).length === 0) {
       // Fallback to the primary language if no language data is available
       return repo.language ? [{ name: repo.language, percent: 100 }] : [];
     }
-    
-    const totalBytes = Object.values(languages).reduce((sum, bytes) => sum + bytes, 0);
-    
+
+    const totalBytes = Object.values(languages).reduce(
+      (sum, bytes) => sum + bytes,
+      0
+    );
+
     return Object.entries(languages)
       .map(([name, bytes]) => ({
         name,
-        percent: Math.round((bytes / totalBytes) * 1000) / 10 // Keep one decimal place
+        percent: Math.round((bytes / totalBytes) * 1000) / 10, // Keep one decimal place
       }))
       .sort((a, b) => b.percent - a.percent)
       .slice(0, 3); // Get top 3 languages
@@ -387,56 +394,75 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
                 {repo.name}
               </a>
             </h3>
-            {readmeContent && (
-              <div className="mt-4">
-                <ReadmePreview content={readmeContent} />
-                <ReadmeStatus 
-                  readmeContent={readmeContent}
-                  repoName={repo.name}
-                  description={repo.description || ''}
-                  languages={languages}
-                  repoUrl={repo.html_url}
-                />
-              </div>
-            )}
+            <p className="text-gray-400 text-sm mt-1 italic">
+              {repo.description || "No description"}
+            </p>
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-500">
             <span className="flex items-center gap-1">
               <StarIcon />
-              {repo.stargazers_count}
+              {repo.stargazers_count.toLocaleString()}
             </span>
             <span className="flex items-center gap-1">
               <GitForkIcon />
-              {repo.forks_count}
+              {repo.forks_count.toLocaleString()}
             </span>
+            {repo.language && (
+              <div className="flex items-center gap-1">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{
+                    backgroundColor: getLanguageColor(repo.language),
+                  }}
+                />
+                <span>{repo.language}</span>
+              </div>
+            )}
+            {isReadmeTooShort && (
+              <button
+                onClick={() => setIsReadmePreviewOpen(true)}
+                className="text-amber-500 hover:text-amber-600 transition-colors"
+                title="This README is too short (under 100 characters). Click to generate a better one."
+              >
+                <FiAlertTriangle className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
         {/* Meta Info */}
-        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mt-3">
           <div className="flex items-center gap-2 flex-wrap">
             {isLoadingLanguages ? (
-              <span className="text-xs text-gray-400">Loading languages...</span>
+              <span className="text-xs text-gray-400">
+                Loading languages...
+              </span>
             ) : Object.keys(languages).length > 0 ? (
               getTopLanguages().map(({ name, percent }) => (
-                <span key={name} className="flex items-center gap-1" title={`${name} (${percent}%)`}>
-                  <span 
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
-                    style={{ 
+                <span
+                  key={name}
+                  className="flex items-center gap-1"
+                  title={`${name} (${percent}%)`}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{
                       backgroundColor: getLanguageColor(name),
-                      boxShadow: '0 0 0 1px rgba(0,0,0,0.1)'
+                      boxShadow: "0 0 0 1px rgba(0,0,0,0.1)",
                     }}
                   ></span>
-                  <span className="text-xs">{name} {percent}%</span>
+                  <span className="text-xs">
+                    {name} {percent}%
+                  </span>
                 </span>
               ))
             ) : repo.language ? (
               <span className="flex items-center gap-1">
-                <span 
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
-                  style={{ 
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{
                     backgroundColor: getLanguageColor(repo.language),
-                    boxShadow: '0 0 0 1px rgba(0,0,0,0.1)'
+                    boxShadow: "0 0 0 1px rgba(0,0,0,0.1)",
                   }}
                   title={repo.language}
                 ></span>
@@ -454,32 +480,62 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
 
         {/* AI Summary */}
         {isLoadingAiSummary ? (
-          <div className="text-gray-500 text-sm">Generating AI summary...</div>
+          <div className="text-gray-500 text-sm mt-4">
+            Generating AI summary...
+          </div>
         ) : aiSummary ? (
-          <div className="prose prose-sm max-w-none border-t pt-4">
+          <div className="prose prose-sm max-w-none border-t pt-4 mt-4">
             <h4 className="text-sm font-medium mb-2">AI Summary ✨</h4>
             <p className="text-gray-600">{aiSummary}</p>
           </div>
         ) : null}
 
-        {/* README Preview */}
-        <div className="border-t pt-4">
-          {readmeContent && (
-            <ReadmePreview
-              content={readmeContent}
-              className="prose prose-sm max-w-none"
-            />
-          )}
-          {readmeContent && (
-            <ReadmeStatus
-              readmeContent={readmeContent}
-              repoName={repo.name}
-              description={repo.description || ''}
-              languages={languages}
-              repoUrl={repo.html_url}
-            />
-          )}
-        </div>
+        {/* README Section */}
+        {readmeContent && (
+          <div className="border border-gray-100 bg-gray-50 rounded-lg p-3 mt-4 shadow-sm">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="text-sm font-semibold text-gray-800">README.md</h4>
+              <button
+                onClick={() => setIsReadmePreviewOpen(!isReadmePreviewOpen)}
+                className="text-xs font-medium text-gray-600 hover:text-gray-900 flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white transition-colors"
+              >
+                {isReadmePreviewOpen ? "Hide" : "View"}
+                <svg
+                  className={`w-3 h-3 transition-transform ${
+                    isReadmePreviewOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {isReadmePreviewOpen && (
+              <div className="bg-white rounded-md p-3 overflow-auto max-h-80 border border-gray-100 shadow-inner">
+                <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono">
+                  {readmeContent}
+                </pre>
+              </div>
+            )}
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <ReadmeStatus
+                readmeContent={readmeContent}
+                repoName={repo.name}
+                description={repo.description || ""}
+                languages={languages}
+                repoUrl={repo.html_url}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
