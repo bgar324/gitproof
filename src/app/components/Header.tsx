@@ -4,7 +4,7 @@ import Link from "next/link";
 
 const Header = () => {
   return (
-    <header className="sticky top-0 z-50 w-full bg-transparent py-4" role="banner">
+    <header className="sticky top-0 z-50 w-full bg-transparent py-4 px-6" role="banner">
       <div className="mx-auto w-full max-w-7xl">
         <div className="bg-white/50 backdrop-blur-md border border-gray-400 rounded-xl h-[56px] px-4 flex items-center shadow-md">
           {/* Logo */}
@@ -14,7 +14,7 @@ const Header = () => {
               className="text-xl font-bold tracking-tight font-reckless flex flex-row gap-2 items-center text-center"
             >
               <Image
-                src="/static/gitprooflogo.png"
+                src="/gitprooflogo.png"
                 alt="LogIt Logo"
                 width={100}
                 height={32}
