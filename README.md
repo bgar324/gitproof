@@ -1,6 +1,6 @@
 <div align="center">
   <p align="center">
-    <img src="/src/app/favicon.ico" alt="GitProof Logo" width="120" />
+    <img src="/public/favicon.png" alt="GitProof Logo" width="120" />
     <h1>GitProof</h1>
     <p>Transform your GitHub activity into recruiter-ready proof of work</p>
     <a href="https://gitproof.vercel.app" target="_blank">
