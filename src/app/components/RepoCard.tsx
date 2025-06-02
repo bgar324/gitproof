@@ -1,11 +1,13 @@
 // RepoCard.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import ReadmePreview from "./ReadmePreview";
+import ReadmeStatus from "./ReadmeStatus";
 import { marked } from "marked";
 import { GitHubRepo } from "../types/github";
 import Image from "next/image";
+import { FiAlertTriangle } from "react-icons/fi";
 
 // Function to generate a consistent color based on language name
 const getLanguageColor = (language: string | null): string => {
@@ -90,41 +92,65 @@ interface LanguageStats {
 
 export default function RepoCard({ repo, session }: RepoCardProps) {
   if (!session?.accessToken) return null;
+  
   const [aiSummary, setAiSummary] = useState<string>("");
-  const [isLoadingAiSummary, setIsLoadingAiSummary] = useState<boolean>(false);
-  const [languages, setLanguages] = useState<LanguageStats>({});
+  const [isReadmeLoading, setIsReadmeLoading] = useState(false);
+  const [readmeContent, setReadmeContent] = useState<string | null>(null);
+  const [languages, setLanguages] = useState<Record<string, number>>({});
   const [isLoadingLanguages, setIsLoadingLanguages] = useState<boolean>(false);
+  const [isLoadingAiSummary, setIsLoadingAiSummary] = useState<boolean>(false);
 
-  // Fetch repository languages
+  // Fetch README content and languages when the component mounts or when the repo changes
   useEffect(() => {
-    const fetchLanguages = async () => {
+    const fetchRepoData = async () => {
       if (!session?.accessToken) return;
       
+      setIsReadmeLoading(true);
       setIsLoadingLanguages(true);
       try {
-        const response = await fetch(
-          `https://api.github.com/repos/${repo.full_name}/languages`,
-          {
-            headers: {
-              'Authorization': `token ${session.accessToken}`,
-              'Accept': 'application/vnd.github.v3+json'
+        // Fetch README
+        const [readmeResponse, languagesResponse] = await Promise.all([
+          fetch(
+            `https://api.github.com/repos/${repo.owner.login}/${repo.name}/readme`,
+            {
+              headers: {
+                Authorization: `token ${session.accessToken}`,
+                Accept: 'application/vnd.github.v3+json',
+              },
             }
-          }
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          setLanguages(data);
+          ),
+          fetch(
+            `https://api.github.com/repos/${repo.owner.login}/${repo.name}/languages`,
+            {
+              headers: {
+                Authorization: `token ${session.accessToken}`,
+                Accept: 'application/vnd.github.v3+json',
+              },
+            }
+          )
+        ]);
+
+        if (readmeResponse.ok) {
+          const readmeData = await readmeResponse.json();
+          const decodedContent = atob(readmeData.content);
+          setReadmeContent(decodedContent);
+        }
+
+        if (languagesResponse.ok) {
+          const languagesData = await languagesResponse.json();
+          setLanguages(languagesData);
         }
       } catch (error) {
-        console.error('Error fetching languages:', error);
+        console.error('Error fetching repository data:', error);
+        setReadmeContent(null);
       } finally {
+        setIsReadmeLoading(false);
         setIsLoadingLanguages(false);
       }
     };
-    
-    fetchLanguages();
-  }, [repo.full_name, session?.accessToken]);
+
+    fetchRepoData();
+  }, [repo, session?.accessToken]);
 
   // Get top 3 languages with their percentages
   const getTopLanguages = (): {name: string, percent: number}[] => {
@@ -361,8 +387,17 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
                 {repo.name}
               </a>
             </h3>
-            {repo.description && (
-              <p className="text-gray-600 text-sm">{repo.description}</p>
+            {readmeContent && (
+              <div className="mt-4">
+                <ReadmePreview content={readmeContent} />
+                <ReadmeStatus 
+                  readmeContent={readmeContent}
+                  repoName={repo.name}
+                  description={repo.description || ''}
+                  languages={languages}
+                  repoUrl={repo.html_url}
+                />
+              </div>
             )}
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-500">
@@ -382,7 +417,7 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
           <div className="flex items-center gap-2 flex-wrap">
             {isLoadingLanguages ? (
               <span className="text-xs text-gray-400">Loading languages...</span>
-            ) : getTopLanguages().length > 0 ? (
+            ) : Object.keys(languages).length > 0 ? (
               getTopLanguages().map(({ name, percent }) => (
                 <span key={name} className="flex items-center gap-1" title={`${name} (${percent}%)`}>
                   <span 
@@ -429,12 +464,21 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
 
         {/* README Preview */}
         <div className="border-t pt-4">
-          <ReadmePreview
-            owner={repo.owner.login}
-            repo={repo.name}
-            accessToken={session.accessToken}
-            className="prose prose-sm max-w-none"
-          />
+          {readmeContent && (
+            <ReadmePreview
+              content={readmeContent}
+              className="prose prose-sm max-w-none"
+            />
+          )}
+          {readmeContent && (
+            <ReadmeStatus
+              readmeContent={readmeContent}
+              repoName={repo.name}
+              description={repo.description || ''}
+              languages={languages}
+              repoUrl={repo.html_url}
+            />
+          )}
         </div>
       </div>
     </div>
