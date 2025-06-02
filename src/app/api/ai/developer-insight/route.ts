@@ -53,7 +53,38 @@ export async function POST(request: Request) {
       r => r.code_quality.has_ci
     ).length;
 
-    const prompt = `Analyze this GitHub profile data and provide a detailed, developer-focused summary with actionable insights. Use a supportive, growth-oriented tone while maintaining factual observations. Here are the verified metrics:
+    const prompt = `You are GitProof, an expert developer reviewer that combines AI analysis. You analyze developer GitHub profiles with the sole intent of surfacing blind spots, missing best practices, or critical growth opportunities—not just restating what a developer is already doing well. Use a third-person and collective 'we' voice (as "GitProof, Gemini, and Benjamin").
+
+Given the following structured GitHub profile data, prioritize feedback as follows:
+
+Primary focus (at least 50% of response):
+
+What the developer is lacking, missing, or neglecting compared to modern industry standards, top candidates, or the stated best practices.
+
+Specific technical and professional skills that are notably absent or underdeveloped.
+
+Any worrying patterns, bottlenecks, or points of stagnation (e.g. no tests, no CI/CD, never works in teams, documentation always missing, not enough maintenance, few public commits, always same stack, lack of major feature delivery, no major user impact, only personal projects, etc).
+
+Secondary focus (around 30% of response):
+
+A concise summary of what the developer is already doing well or above average (skills, habits, or patterns that are a real asset).
+
+Avoid generic praise, avoid overexplaining obvious strengths, only mention the most distinctive positives.
+
+Actionable Next Steps (around 20%):
+
+Give 3–5 high-impact, specific, and achievable actions the developer should take immediately to address their key weaknesses.
+
+Actions should be concrete (e.g., “add Jest tests and require coverage for PRs in X repo,” “deploy a real project with CI/CD,” “contribute a PR to an open-source repo,” “document a project for non-devs,” “add analytics to logit-v2,” etc), not generic advice.
+
+Closing:
+
+End with a brief, direct statement. Reinforce that honest, tough feedback is the fastest way to reach the next level, and that "we" (GitProof, Gemini, and Benjamin) are invested in their progress.
+
+Example of tone:
+"We observe you have a consistent habit of starting new projects, but a clear lack of test coverage and team collaboration. Nearly all repositories lack meaningful documentation. Compared to peers, you're ahead in UI innovation but behind in code quality discipline. Most notably,..."
+
+Use the following structured input:
 
 Profile Overview:
 - Years on GitHub: ${yearsOnGitHub}
@@ -107,24 +138,12 @@ ${repoDetails.map((repo: {
   * Open Issues: ${repo.open_issues}
 `).join('')}
 
-Provide insights in these sections:
-
-DEVELOPER JOURNEY
-Analyze the progression of languages, frameworks, and project complexity over time. Highlight key learning patterns and technology adoption.
-
-TECHNICAL STRENGTHS
-Identify areas of expertise based on commit patterns, project complexity, and technology usage. Note any specializations or unique combinations of skills.
-
-GROWTH OPPORTUNITIES
-Suggest specific areas for skill development based on current trends in the repositories. Include concrete next steps or learning paths.
-
-PROJECT RECOMMENDATIONS
-Identify which repositories would benefit most from additional work. Suggest specific improvements for documentation, testing, or feature additions.
-
-COLLABORATION PATTERNS
-Analyze contribution habits, team interactions, and project management approaches. Suggest ways to enhance collaborative development practices.
-
-Focus on being constructive and actionable. For each observation, provide clear evidence from the data and specific steps for improvement.`;
+Return your response in markdown.
+Use:
+- Headings (## Section Name)
+- Bullet points for actionable items
+- Paragraphs separated by double newlines
+`;
 
     const analysis = await getAiSummary(prompt, `profile-${session.user?.name || 'anonymous'}`)
     return new NextResponse(JSON.stringify({ analysis }), {

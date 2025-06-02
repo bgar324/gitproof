@@ -276,7 +276,7 @@ export default function DashboardPage() {
                 <h2 className="text-xl font-semibold font-reckless">
                   {session?.user?.name}
                 </h2>
-                <p className="text-gray-500">{session?.user?.email}</p>
+                <p className="text-sm text-gray-500">{session?.user?.email}</p>
               </div>
             </div>
             <button

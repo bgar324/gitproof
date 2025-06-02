@@ -15,24 +15,23 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Git Proof",
-  description: "Turn your GitHub into recruiter-ready proof with automated project summaries and résumé-grade PDF exports.",
+  description:
+    "Turn your GitHub into recruiter-ready proof with automated project summaries and résumé-grade PDF exports.",
   icons: {
-    icon: '/gitprooffavicon.png',
-    shortcut: '/gitprooffavicon.png',
-    apple: '/gitprooffavicon.png',
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
   },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

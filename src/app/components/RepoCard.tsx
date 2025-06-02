@@ -422,7 +422,7 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
           <div className="text-gray-500 text-sm">Generating AI summary...</div>
         ) : aiSummary ? (
           <div className="prose prose-sm max-w-none border-t pt-4">
-            <h4 className="text-sm font-medium mb-2">AI Summary</h4>
+            <h4 className="text-sm font-medium mb-2">AI Summary ✨</h4>
             <p className="text-gray-600">{aiSummary}</p>
           </div>
         ) : null}
