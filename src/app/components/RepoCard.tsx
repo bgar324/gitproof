@@ -207,7 +207,9 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
       });
 
       if (!aiApiRes.ok) {
-        setAiSummary(`Error: AI API responded with status ${aiApiRes.status}.`);
+        setAiSummary(
+          `Error: AI API responded with status ${aiApiRes.status}.`
+        );
         return;
       }
       const data = await aiApiRes.json();
@@ -246,6 +248,25 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
               >
                 {repo.name}
               </a>
+              <button
+                type="button"
+                onClick={fetchAiSummary}
+                disabled={isLoadingAiSummary}
+                className="text-yellow-500 hover:text-yellow-600 transition-colors p-1 rounded focus:outline-none"
+                title="Generate AI Summary"
+              >
+                <Sparkle className={`w-4 h-4 ${isLoadingAiSummary ? "animate-spin" : ""}`} />
+              </button>
+              {aiSummary && (
+                <button
+                  type="button"
+                  onClick={clearAiSummaryCache}
+                  className="ml-1 text-gray-400 hover:text-red-500 p-1 rounded focus:outline-none"
+                  title="Clear AI Summary Cache"
+                >
+                  <FiTrash2 className="w-4 h-4" />
+                </button>
+              )}
             </h3>
             <p className="text-gray-400 text-sm mt-1 italic">
               {repo.description || "No description"}
@@ -281,29 +302,6 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
               </button>
             )}
           </div>
-        </div>
-
-        {/* Sparkle/Trash under language row */}
-        <div className="flex flex-row items-center gap-1 ml-auto" style={{ marginTop: -8, marginBottom: 0, minHeight: 0 }}>
-          <button
-            type="button"
-            onClick={fetchAiSummary}
-            disabled={isLoadingAiSummary}
-            className="text-yellow-500 hover:text-yellow-600 transition-colors p-1 rounded focus:outline-none"
-            title="Generate AI Summary"
-          >
-            <Sparkle className={`w-4 h-4 ${isLoadingAiSummary ? "animate-spin" : ""}`} />
-          </button>
-          {aiSummary && (
-            <button
-              type="button"
-              onClick={clearAiSummaryCache}
-              className="text-gray-400 hover:text-red-500 p-1 rounded focus:outline-none"
-              title="Clear AI Summary Cache"
-            >
-              <FiTrash2 className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
         {/* Meta Info */}
