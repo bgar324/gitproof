@@ -1,5 +1,13 @@
-// RepoCard.tsx
 "use client";
+
+import { useEffect, useState } from "react";
+import ReadmePreview from "./ReadmePreview";
+import ReadmeStatus from "./ReadmeStatus";
+import { marked } from "marked";
+import { GitHubRepo } from "../../types/github";
+import Image from "next/image";
+import { FiAlertTriangle, FiTrash2 } from "react-icons/fi";
+import { Sparkle } from "lucide-react";
 
 function decodeBase64Utf8(base64: any) {
   const binary = atob(base64);
@@ -7,19 +15,8 @@ function decodeBase64Utf8(base64: any) {
   return new TextDecoder("utf-8").decode(bytes);
 }
 
-import { useEffect, useState, useCallback } from "react";
-import ReadmePreview from "./ReadmePreview";
-import ReadmeStatus from "./ReadmeStatus";
-import { marked } from "marked";
-import { GitHubRepo } from "../../types/github";
-import Image from "next/image";
-import { FiAlertTriangle } from "react-icons/fi";
-
-// Function to generate a consistent color based on language name
 const getLanguageColor = (language: string | null): string => {
-  if (!language) return "#94a3b8"; // Default gray color for unknown languages
-
-  // Common languages with their GitHub colors
+  if (!language) return "#94a3b8";
   const languageColors: Record<string, string> = {
     JavaScript: "#f1e05a",
     TypeScript: "#3178c6",
@@ -44,19 +41,13 @@ const getLanguageColor = (language: string | null): string => {
     Angular: "#dd0031",
     Svelte: "#ff3e00",
   };
-
-  // If we have a defined color, use it
   if (languageColors[language]) {
     return languageColors[language];
   }
-
-  // Otherwise, generate a consistent color from the language name
   let hash = 0;
   for (let i = 0; i < language.length; i++) {
     hash = language.charCodeAt(i) + ((hash << 5) - hash);
   }
-
-  // Generate a pastel color using HSL
   const h = Math.abs(hash) % 360;
   return `hsl(${h}, 70%, 65%)`;
 };
@@ -92,33 +83,27 @@ const formatDate = (date: string) => {
   });
 };
 
-interface LanguageStats {
-  [key: string]: number;
-}
-
 export default function RepoCard({ repo, session }: RepoCardProps) {
   if (!session?.accessToken) return null;
 
+  const summaryKey = `aiSummary:${repo.full_name}`;
   const [aiSummary, setAiSummary] = useState<string>("");
   const [isReadmeLoading, setIsReadmeLoading] = useState(false);
   const [readmeContent, setReadmeContent] = useState<string | null>(null);
   const [isReadmePreviewOpen, setIsReadmePreviewOpen] = useState(false);
   const wordCount = readmeContent ? readmeContent.split(/\s+/).length : 0;
   const charCount = readmeContent ? readmeContent.length : 0;
-  const isReadmeTooShort = charCount < 100; // Flag for READMEs under 100 characters
+  const isReadmeTooShort = charCount < 100;
   const [languages, setLanguages] = useState<Record<string, number>>({});
   const [isLoadingLanguages, setIsLoadingLanguages] = useState<boolean>(false);
   const [isLoadingAiSummary, setIsLoadingAiSummary] = useState<boolean>(false);
 
-  // Fetch README content and languages when the component mounts or when the repo changes
   useEffect(() => {
     const fetchRepoData = async () => {
       if (!session?.accessToken) return;
-
       setIsReadmeLoading(true);
       setIsLoadingLanguages(true);
       try {
-        // Fetch README and languages in parallel
         const [readmeResponse, languagesResponse] = await Promise.all([
           fetch(
             `https://api.github.com/repos/${repo.owner.login}/${repo.name}/readme`,
@@ -140,13 +125,11 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
           ),
         ]);
 
-        // README fetch logic
         if (readmeResponse.ok) {
           const contentType = readmeResponse.headers.get("content-type") || "";
           if (contentType.includes("application/json")) {
             const readmeData = await readmeResponse.json();
             const decodedContent = decodeBase64Utf8(readmeData.content);
-            console.log("DECODED README", decodedContent.slice(0, 100)); // <--- put this line here
             setReadmeContent(decodedContent);
           } else {
             const rawMarkdown = await readmeResponse.text();
@@ -172,235 +155,89 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
     fetchRepoData();
   }, [repo, session?.accessToken]);
 
-  // Get top 3 languages with their percentages
+  useEffect(() => {
+    const cached = localStorage.getItem(summaryKey);
+    if (cached) setAiSummary(cached);
+    else setAiSummary("");
+  }, [repo.full_name]);
+
   const getTopLanguages = (): { name: string; percent: number }[] => {
     if (Object.keys(languages).length === 0) {
-      // Fallback to the primary language if no language data is available
       return repo.language ? [{ name: repo.language, percent: 100 }] : [];
     }
-
     const totalBytes = Object.values(languages).reduce(
       (sum, bytes) => sum + bytes,
       0
     );
-
     return Object.entries(languages)
       .map(([name, bytes]) => ({
         name,
-        percent: Math.round((bytes / totalBytes) * 1000) / 10, // Keep one decimal place
+        percent: Math.round((bytes / totalBytes) * 1000) / 10,
       }))
       .sort((a, b) => b.percent - a.percent)
-      .slice(0, 3); // Get top 3 languages
+      .slice(0, 3);
   };
 
-  useEffect(() => {
-    const fetchAndSetAiSummary = async () => {
-      if (repo.name === "mtsaccs-v2") {
-        // Your specific condition
-        setIsLoadingAiSummary(true);
-        setAiSummary("");
-        console.log(`REPO_CARD (${repo.name}): Checking for AI summary.`);
-        let readmeContent = ""; // Initialize here to ensure it's always available
+  const fetchAiSummary = async () => {
+    const cached = localStorage.getItem(summaryKey);
+    if (cached) {
+      setAiSummary(cached);
+      return;
+    }
+    setIsLoadingAiSummary(true);
+    setAiSummary("");
+    try {
+      const langStats = Object.keys(languages).length
+        ? languages
+        : { [repo.language || "Unknown"]: 100 };
 
-        try {
-          const readmeUrl = `https://api.github.com/repos/${repo.full_name}/readme`;
-          console.log(
-            `REPO_CARD (${repo.name}): Fetching README info from GitHub: ${readmeUrl}`
-          );
+      const payload = {
+        repoName: repo.name,
+        description: repo.description || "A project.",
+        languages: langStats,
+        readme: (readmeContent || "")
+          .replace(/[\u0000-\u001F]/g, "")
+          .slice(0, 3000),
+      };
 
-          const readmeRes = await fetch(readmeUrl, {
-            headers: {
-              // Explicitly ask for JSON. GitHub API v3 usually defaults to this for this endpoint.
-              Accept: "application/vnd.github.v3+json, application/json",
-            },
-          });
+      const aiApiRes = await fetch("/api/ai/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-          let rawMarkdownText = "";
-
-          if (!readmeRes.ok) {
-            console.warn(
-              `REPO_CARD (${repo.name}): GitHub API error for README metadata. Status: ${readmeRes.status} ${readmeRes.statusText}`
-            );
-            try {
-              const ghErrorBody = await readmeRes.text();
-              console.warn(
-                `REPO_CARD (${
-                  repo.name
-                }): GitHub error body: ${ghErrorBody.substring(0, 200)}`
-              );
-            } catch (e) {
-              /* ignore */
-            }
-          } else {
-            const githubResponseClone = readmeRes.clone(); // Clone for potential re-read
-            let readmeApiData;
-            try {
-              readmeApiData = await readmeRes.json(); // Try to parse as JSON (expected behavior)
-              console.log(
-                `REPO_CARD (${repo.name}): Successfully parsed GitHub README metadata as JSON.`
-              );
-              const downloadUrl = readmeApiData.download_url;
-
-              if (downloadUrl) {
-                console.log(
-                  `REPO_CARD (${repo.name}): Fetching raw README content from download_url: ${downloadUrl}`
-                );
-                const rawContentRes = await fetch(downloadUrl);
-                if (rawContentRes.ok) {
-                  rawMarkdownText = await rawContentRes.text();
-                } else {
-                  console.warn(
-                    `REPO_CARD (${repo.name}): Failed to fetch raw README from download_url. Status: ${rawContentRes.status}`
-                  );
-                }
-              } else {
-                console.warn(
-                  `REPO_CARD (${repo.name}): download_url not found in GitHub README metadata. This is unexpected if JSON parsing succeeded.`
-                );
-                // As a fallback, if JSON was parsed but no download_url, maybe the original response was text?
-                // This case is less likely if the above json() succeeded without error.
-                rawMarkdownText = await githubResponseClone.text();
-                console.log(
-                  `REPO_CARD (${repo.name}): Used cloned initial response as raw markdown due to missing download_url.`
-                );
-              }
-            } catch (jsonParseError) {
-              // jsonParseError is 'unknown'
-              // THIS IS THE PATH CURRENTLY BEING HIT
-              let errorMessage =
-                "An unknown error occurred during JSON parsing.";
-              if (jsonParseError instanceof Error) {
-                errorMessage = jsonParseError.message;
-              } else if (typeof jsonParseError === "string") {
-                errorMessage = jsonParseError;
-              }
-
-              console.warn(
-                `REPO_CARD (${repo.name}): Could not parse GitHub response from ${readmeUrl} as JSON. Assuming it's raw Markdown content. Error: ${errorMessage}`
-              );
-              // The response body itself is likely the raw markdown.
-              // Ensure githubResponseClone is still in scope and valid if this path is hit.
-              // It should be, as it was defined before this try-catch for readmeRes.json().
-              rawMarkdownText = await githubResponseClone.text(); // Re-read from clone
-            }
-          }
-
-          if (rawMarkdownText) {
-            console.log(
-              `REPO_CARD (${repo.name}): Raw Markdown fetched (length: ${rawMarkdownText.length}). Cleaning...`
-            );
-            readmeContent = (await marked.parse(rawMarkdownText))
-              .replace(/<[^>]+>/g, "") // Remove HTML tags
-              .replace(/\s\s+/g, " ") // Replace multiple spaces/newlines with single space
-              .trim();
-            console.log(
-              `REPO_CARD (${repo.name}): Cleaned README content length:`,
-              readmeContent.length
-            );
-          } else {
-            console.warn(
-              `REPO_CARD (${repo.name}): No raw markdown content was successfully obtained for README.`
-            );
-          }
-
-          // --- Proceed to fetch AI summary ---
-          console.log(
-            `REPO_CARD (${repo.name}): Preparing payload for AI summary API.`
-          );
-          const payload = {
-            repoName: repo.name,
-            description: repo.description || "A project.",
-            languages: { [repo.language || "Unknown"]: 100 }, // Adjust as needed
-            readme: readmeContent
-              .replace(/[\u0000-\u001F]/g, "")
-              .slice(0, 3000), // Increased slice limit slightly
-          };
-          console.log(
-            `REPO_CARD (${repo.name}): Sending payload (README snippet):`,
-            {
-              ...payload,
-              readme: payload.readme.substring(0, 100) + "...",
-            }
-          );
-
-          const aiApiRes = await fetch("/api/ai/summary", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-
-          if (!aiApiRes.ok) {
-            console.error(
-              `REPO_CARD (${repo.name}): AI summary API error status:`,
-              aiApiRes.status,
-              aiApiRes.statusText
-            );
-            let errorBody = "Could not retrieve error body.";
-            try {
-              errorBody = await aiApiRes.text();
-            } catch (e) {
-              /* ignore */
-            }
-            console.error(
-              `REPO_CARD (${repo.name}): AI summary API error body:`,
-              errorBody
-            );
-            setAiSummary(
-              `Error: AI API responded with status ${aiApiRes.status}.`
-            );
-          } else {
-            const aiApiResponseClone = aiApiRes.clone();
-            const rawAiApiResponseText = await aiApiResponseClone.text();
-            console.log(
-              `REPO_CARD (${repo.name}): RAW AI API RESPONSE for summary:`,
-              rawAiApiResponseText
-            );
-            try {
-              const data = await aiApiRes.json();
-              if (data.summary) {
-                setAiSummary(data.summary);
-              } else if (data.error) {
-                setAiSummary(`API Error: ${data.details || data.error}`);
-              } else {
-                setAiSummary("Received unexpected data from AI summary API.");
-              }
-            } catch (aiJsonParseError) {
-              setAiSummary(
-                "Error: Could not parse AI API response. Raw: " +
-                  rawAiApiResponseText.substring(0, 70) +
-                  "..."
-              );
-            }
-          }
-        } catch (error) {
-          console.error(
-            `REPO_CARD (${repo.name}): General unexpected error in fetchAndSetAiSummary:`,
-            error
-          );
-          setAiSummary(
-            "Failed to fetch AI summary due to a critical unexpected error."
-          );
-        } finally {
-          setIsLoadingAiSummary(false);
-        }
-      } else {
-        setAiSummary("");
-        setIsLoadingAiSummary(false);
+      if (!aiApiRes.ok) {
+        setAiSummary(`Error: AI API responded with status ${aiApiRes.status}.`);
+        return;
       }
-    };
+      const data = await aiApiRes.json();
+      if (data.summary) {
+        setAiSummary(data.summary);
+        localStorage.setItem(summaryKey, data.summary);
+      } else if (data.error) {
+        setAiSummary(`API Error: ${data.details || data.error}`);
+      } else {
+        setAiSummary("Received unexpected data from AI summary API.");
+      }
+    } catch (err) {
+      setAiSummary("Failed to fetch AI summary due to an error.");
+    } finally {
+      setIsLoadingAiSummary(false);
+    }
+  };
 
-    fetchAndSetAiSummary();
-  }, [repo.name, repo.description, repo.full_name, repo.language]); // Ensure dependencies are correct
+  const clearAiSummaryCache = () => {
+    localStorage.removeItem(summaryKey);
+    setAiSummary("");
+  };
 
-  // --- JSX for rendering ---
-  let summaryDisplay = aiSummary;
   return (
     <div className="notion-card p-6">
       <div className="flex flex-col gap-4">
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-lg font-semibold mb-1">
+            <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
               <a
                 href={repo.html_url}
                 target="_blank"
@@ -444,6 +281,29 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Sparkle/Trash under language row */}
+        <div className="flex flex-row items-center gap-1 ml-auto" style={{ marginTop: -8, marginBottom: 0, minHeight: 0 }}>
+          <button
+            type="button"
+            onClick={fetchAiSummary}
+            disabled={isLoadingAiSummary}
+            className="text-yellow-500 hover:text-yellow-600 transition-colors p-1 rounded focus:outline-none"
+            title="Generate AI Summary"
+          >
+            <Sparkle className={`w-4 h-4 ${isLoadingAiSummary ? "animate-spin" : ""}`} />
+          </button>
+          {aiSummary && (
+            <button
+              type="button"
+              onClick={clearAiSummaryCache}
+              className="text-gray-400 hover:text-red-500 p-1 rounded focus:outline-none"
+              title="Clear AI Summary Cache"
+            >
+              <FiTrash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Meta Info */}
