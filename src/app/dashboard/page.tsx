@@ -267,11 +267,12 @@ export default function DashboardPage() {
         onClose={() => setShowExport(false)}
         userProfile={{
           name: session?.user?.name || "",
-          avatarUrl: session?.user?.image || "",
-          githubUrl:
+          avatar_url: session?.user?.image || "",
+          html_url:
             session?.user?.html_url ||
             `https://github.com/${session?.user?.name}`,
           bio: null,
+          login: session?.user?.name || ""
         }}
         repos={stats.repos}
         topLanguages={stats.topLanguages}

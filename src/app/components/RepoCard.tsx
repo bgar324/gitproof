@@ -15,7 +15,7 @@ function decodeBase64Utf8(base64: any) {
   return new TextDecoder("utf-8").decode(bytes);
 }
 
-const getLanguageColor = (language: string | null): string => {
+export const getLanguageColor = (language: string | null): string => {
   if (!language) return "#94a3b8";
   const languageColors: Record<string, string> = {
     JavaScript: "#f1e05a",

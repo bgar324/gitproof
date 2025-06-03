@@ -1,434 +1,488 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
-import ExportConfig from "./ExportConfig";
-import ExportPreview from "./ExportPreview";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
-import { ExportConfig as ExportConfigType } from "../../types/export";
-import { GitHubRepo } from "../../types/github";
-import { FiX, FiDownload, FiRefreshCw, FiCheck } from "react-icons/fi";
+import { useState, useCallback, useMemo } from "react";
+import { FiX, FiDownload, FiRefreshCw } from "react-icons/fi";
+import { GitHubRepo } from "@/types/github";
+import {
+  ExportConfig as ExportConfigType,
+  ProjectExport,
+  StackSummary,
+} from "@/types/export";
+import type { ExportConfig } from "@/types/export";
+import { useSession } from "next-auth/react";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import PdfDocument from "./PdfDocument";
+import { format } from "date-fns";
 
 type ExportStatus = "idle" | "generating" | "success" | "error";
+
+interface UserProfile {
+  name: string;
+  login: string;
+  avatar_url: string;
+  bio?: string | null;
+  location?: string;
+  email?: string;
+  blog?: string;
+  twitter_username?: string;
+  company?: string;
+  html_url: string;
+}
 
 interface ExportModalProps {
   open: boolean;
   onClose: () => void;
-  userProfile: {
-    name: string;
-    avatarUrl: string;
-    githubUrl: string;
-    bio: string | null;
-  };
+  userProfile: UserProfile;
   repos: GitHubRepo[];
-  topLanguages: { name: string; percentage: number }[];
+  topLanguages: Array<{ name: string; percentage: number }>;
 }
 
-export default function ExportModal({
+const ExportModal: React.FC<ExportModalProps> = ({
   open,
   onClose,
   userProfile,
   repos,
   topLanguages,
-}: ExportModalProps) {
-  const [exportConfig, setExportConfig] = useState<ExportConfigType>({
+}) => {
+  const { data: session } = useSession();
+  const [exportConfig, setExportConfig] = useState<ExportConfig>({
+    // Default sections
     sections: {
       identity: true,
       stack: true,
       projects: true,
-      visuals: true,
-      keywords: false,
+      visuals: false, // Removed but kept in type for backward compatibility
+      keywords: false, // Removed but kept in type for backward compatibility
     },
-    maxProjects: 3,
+    maxProjects: 3, // Hardcoded to 3 as per requirements
     includeReadmeBullets: true,
     includeDeveloperSummary: true,
-    includeKeywords: false,
-    includeTechStack: true,
+    includeKeywords: false, // Removed as per requirements
+    includeTechStack: false, // Removed as per requirements
+    includeCommitHeatmap: false,
+    includePieChart: false,
   });
 
   const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
-  const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
-  const [aiSummaries, setAiSummaries] = useState<Record<string, string>>({});
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
-  // Toggle repository selection
-  const toggleRepoSelection = (repoId: string) => {
-    const newSelection = new Set(selectedRepos);
-    if (newSelection.has(repoId)) {
-      newSelection.delete(repoId);
-    } else if (newSelection.size < exportConfig.maxProjects) {
-      newSelection.add(repoId);
-    }
-    setSelectedRepos(newSelection);
+  const generatedAt = useMemo(() => format(new Date(), "MMMM d, yyyy"), []);
+
+  const handleSectionToggle = (section: keyof ExportConfig["sections"]) => {
+    setExportConfig((cfg) => ({
+      ...cfg,
+      sections: {
+        ...cfg.sections,
+        [section]: !cfg.sections[section],
+      },
+    }));
   };
 
-  // Generate AI summary for a repository
-  const generateAiSummary = async (repo: GitHubRepo) => {
-    if (aiSummaries[repo.name]) return;
+  const handleToggleRepo = useCallback(
+    (repoId: string) => {
+      if (!repoId) return;
 
-    setIsGeneratingAi(true);
-    try {
-      const response = await fetch("/api/ai/generate-summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          repoName: repo.name,
-          description: repo.description,
-          language: repo.language,
-          stars: repo.stargazers_count,
-          topics: repo.topics || [],
-        }),
-      });
-
-      if (!response.ok) throw new Error("Failed to generate AI summary");
-      const { summary } = await response.json();
-
-      setAiSummaries((prev) => ({
-        ...prev,
-        [repo.name]: summary,
-      }));
-    } catch (error) {
-      console.error("Error generating AI summary:", error);
-    } finally {
-      setIsGeneratingAi(false);
-    }
-  };
-
-  // Handle export to PDF
-  const handleExport = async () => {
-    const element = document.getElementById("export-preview");
-    if (!element) return;
-
-    setExportStatus("generating");
-    setIsExporting(true);
-
-    try {
-      // Wait for fonts to load
-      await document.fonts.ready;
-      
-      // Calculate dimensions for A4 at 96 DPI
-      const targetWidth = 8.27 * 96; // A4 width in pixels at 96 DPI
-      const targetHeight = 11.69 * 96; // A4 height in pixels at 96 DPI
-
-      // Create a style element for PDF-specific styles
-      const style = document.createElement('style');
-      style.textContent = `
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Reckless:wght@400;500;600;700&display=swap');
-        #export-preview {
-          width: ${targetWidth}px !important;
-          min-height: ${targetHeight}px !important;
-          background: white !important;
-          padding: 40px !important;
-          box-shadow: none !important;
-          border-radius: 0 !important;
-        }
-        #export-preview * {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        .project-card {
-          page-break-inside: avoid !important;
-          break-inside: avoid !important;
-        }
-        .tech-stack {
-          flex-wrap: nowrap !important;
-        }
-        .tech-pill {
-          white-space: nowrap !important;
-        }
-      `;
-      
-      // Store original styles
-      const originalStyles = {
-        width: element.style.width,
-        minWidth: element.style.minWidth,
-        maxWidth: element.style.maxWidth,
-        height: element.style.height,
-        minHeight: element.style.minHeight,
-        maxHeight: element.style.maxHeight,
-        padding: element.style.padding,
-        boxShadow: element.style.boxShadow,
-        borderRadius: element.style.borderRadius,
-      };
-
-      // Apply PDF-specific styles
-      element.style.width = `${targetWidth}px`;
-      element.style.minWidth = `${targetWidth}px`;
-      element.style.maxWidth = `${targetWidth}px`;
-      element.style.height = 'auto';
-      element.style.overflow = 'visible';
-      element.style.padding = '40px';
-      element.style.boxShadow = 'none';
-      element.style.borderRadius = '0';
-
-      // Add the style to the document
-      document.head.appendChild(style);
-      
-      // Render to canvas with html2canvas
-      const canvas = await html2canvas(element as HTMLElement, {
-        scale: 2, // Higher scale for better quality
-        useCORS: true,
-        logging: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: targetWidth,
-        width: targetWidth,
-        height: element.scrollHeight,
-        onclone: (clonedDoc: Document) => {
-          // Apply the same styles to the cloned document
-          clonedDoc.head.appendChild(style.cloneNode(true));
-          const clonedElement = clonedDoc.getElementById('export-preview');
-          if (clonedElement) {
-            clonedElement.classList.add('pdf-exporting');
+      setSelectedRepos((prev) => {
+        try {
+          const newSet = new Set(prev);
+          if (newSet.has(repoId)) {
+            newSet.delete(repoId);
+          } else {
+            // Ensure we don't exceed max projects
+            if (newSet.size < exportConfig.maxProjects) {
+              newSet.add(repoId);
+            }
           }
-        },
-      } as any); // Using 'as any' to bypass TypeScript type checking for html2canvas options
-
-      // Clean up
-      document.head.removeChild(style);
-      element.classList.remove('pdf-exporting');
-      
-      // Restore original styles
-      Object.assign(element.style, originalStyles);
-
-      // Create PDF
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      // Add image to PDF
-      const imgData = canvas.toDataURL('image/png', 1.0);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      // Add the image to the PDF
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-      
-      // Save the PDF
-      pdf.save('gitproof-export.pdf');
-      setExportStatus('success');
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      setExportStatus('error');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  // Prepare projects data with AI summaries
-  const projects = useMemo(() => {
-    return repos
-      .filter(
-        (repo) =>
-          selectedRepos.has(repo.id.toString()) || selectedRepos.size === 0
-      )
-      .slice(0, exportConfig.maxProjects)
-      .map((repo) => ({
-        id: repo.id.toString(),
-        name: repo.name,
-        full_name: repo.full_name,
-        summary: repo.description || "",
-        description: repo.description,
-        tags: [repo.language, ...(repo.topics || [])].filter(Boolean) as string[],
-        bullets: aiSummaries[repo.name] ? [aiSummaries[repo.name]] : [],
-        url: repo.html_url,
-        html_url: repo.html_url,
-        language: repo.language,
-        languages_url: repo.languages_url,
-        stars: repo.stargazers_count,
-        stargazers_count: repo.stargazers_count,
-        forks_count: repo.forks_count,
-        commit_count: repo.commit_count,
-        pushed_at: repo.pushed_at,
-        created_at: repo.created_at,
-        updated_at: repo.updated_at,
-        hasReadme: true,
-        homepage: repo.homepage || null,
-        owner: {
-          login: repo.owner?.login || '',
-          avatar_url: repo.owner?.avatar_url || '',
-          html_url: repo.owner?.html_url || ''
+          return newSet;
+        } catch (error) {
+          console.error("Error toggling repo:", error);
+          return prev;
         }
-      }));
-  }, [repos, selectedRepos, exportConfig.maxProjects, aiSummaries]);
+      });
+    },
+    [exportConfig.maxProjects]
+  );
 
-  // Get top frameworks from repos
-  const topFrameworks = useMemo(() => {
-    const frameworkCounts = new Map<string, number>();
+  const pdfProjects = useMemo<ProjectExport[]>(() => {
+    try {
+      if (!Array.isArray(repos) || !selectedRepos.size) return [];
 
-    repos.forEach((repo) => {
-      if (repo.topics) {
-        repo.topics.forEach((topic) => {
-          frameworkCounts.set(topic, (frameworkCounts.get(topic) || 0) + 1);
-        });
-      }
-    });
+      return repos
+        .filter((repo) => repo?.id && selectedRepos.has(repo.id.toString()))
+        .map((repo) => ({
+          id: repo.id?.toString() || "",
+          name: repo.name || "Untitled Project",
+          full_name: repo.full_name || "",
+          summary: repo.description || "",
+          description: repo.description || "",
+          tags: Array.isArray(repo.topics) ? repo.topics : [],
+          bullets: [],
+          url: repo.html_url || "#",
+          html_url: repo.html_url || "#",
+          language: repo.language || "Other",
+          languages_url: repo.languages_url || "",
+          stars: repo.stargazers_count || 0,
+          stargazers_count: repo.stargazers_count || 0,
+          forks_count: repo.forks_count || 0,
+          pushed_at: repo.pushed_at || "",
+          created_at: repo.created_at || "",
+          updated_at: repo.updated_at || "",
+          hasReadme: !!repo.has_readme,
+          owner: {
+            login: repo.owner?.login || "",
+            avatar_url: repo.owner?.avatar_url || "",
+            html_url: repo.owner?.html_url || "",
+          },
+        }));
+    } catch (error) {
+      console.error("Error preparing projects for PDF:", error);
+      return [];
+    }
+  }, [repos, selectedRepos]);
 
-    return Array.from(frameworkCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([name]) => name);
-  }, [repos]);
+  const stackSummary: StackSummary = useMemo(
+    () => ({
+      languages: topLanguages,
+      topFrameworks: [],
+      mostActiveTime: "Afternoon",
+      stats: {
+        repositoryCount: repos.length,
+        totalCommits: 0,
+        longestStreak: 0,
+        totalStars: repos.reduce(
+          (sum, repo) => sum + (repo.stargazers_count || 0),
+          0
+        ),
+      },
+    }),
+    [topLanguages, repos]
+  );
+
+  const pdfKey = [
+    exportConfig.sections.identity ? "id1" : "id0",
+    exportConfig.sections.stack ? "st1" : "st0",
+    exportConfig.sections.projects ? "pr1" : "pr0",
+    Array.from(selectedRepos).sort().join("_"),
+    exportConfig.maxProjects,
+    exportConfig.includeReadmeBullets ? "rd1" : "rd0",
+    exportConfig.includeDeveloperSummary ? "ds1" : "ds0",
+    exportConfig.includeKeywords ? "kw1" : "kw0",
+    exportConfig.includeTechStack ? "ts1" : "ts0",
+    exportConfig.includeCommitHeatmap ? "cm1" : "cm0",
+    exportConfig.includePieChart ? "pc1" : "pc0",
+  ].join("|");
 
   if (!open) return null;
 
-  // Render export status message
-  const renderExportStatus = () => {
-    if (exportStatus === 'generating') {
-      return (
-        <div className="flex items-center space-x-2 text-blue-600">
-          <FiRefreshCw className="animate-spin" />
-          <span>Generating PDF...</span>
-        </div>
-      );
-    }
-    
-    if (exportStatus === 'success') {
-      return (
-        <div className="flex items-center space-x-2 text-green-600">
-          <FiCheck className="text-xl" />
-          <span>PDF generated successfully!</span>
-        </div>
-      );
-    }
-    
-    if (exportStatus === 'error') {
-      return (
-        <div className="flex items-center space-x-2 text-red-600">
-          <FiX className="text-xl" />
-          <span>Failed to generate PDF. Please try again.</span>
-        </div>
-      );
-    }
-    
-    return null;
-  };
-
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm transition-all">
       <div
-        className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col"
-        style={{ color: "#1a1a1a" }}
+        className="
+          w-full max-w-2xl mx-auto
+          rounded-2xl
+          shadow-xl
+          bg-white/80
+          backdrop-blur-lg
+          border border-gray-200
+          relative
+          flex flex-col
+          min-h-[520px]
+          max-h-[88vh]
+          ring-1 ring-black/5
+        "
+        style={{ fontFamily: "inherit" }}
       >
         {/* Header */}
-        <div className="border-b p-4 flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Export Profile to PDF</h2>
+        <div className="sticky top-0 z-10 flex items-center justify-between px-8 py-6 border-b border-gray-100 bg-white/90 backdrop-blur-lg rounded-t-xl">
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-row gap-3 items-center">
+              <img
+                src="/gitprooflogo.png"
+                alt="Git Proof Logo"
+                className="w-8 h-8 object-contain"
+              />
+              <span className="text-2xl font-bold tracking-tight leading-none">
+                Git Proof
+              </span>
+            </div>
+            <span className="text-xs font-medium text-gray-500 ml-11 mt-0.5">
+              Export PDF
+            </span>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-            disabled={isExporting}
+            className="text-gray-400 hover:text-gray-800 rounded-full p-2 transition-colors focus:outline-none"
+            aria-label="Close"
           >
-            <FiX className="w-6 h-6" />
+            <FiX size={24} />
           </button>
         </div>
 
-        {/* Main Content */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left Sidebar - Configuration */}
-          <div className="w-80 border-r p-6 overflow-y-auto">
-            <ExportConfig
-              config={exportConfig}
-              onConfigChange={setExportConfig}
-              onExport={handleExport}
-              disabled={isExporting}
-              repos={repos}
-              selectedRepos={selectedRepos}
-              onToggleRepo={toggleRepoSelection}
-              onGenerateAiSummary={generateAiSummary}
-              isGeneratingAi={isGeneratingAi}
-            />
-          </div>
-
-          {/* Right Side - Preview */}
-          <div className="flex-1 overflow-auto p-6">
-            <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
-              <div id="export-preview" className="p-8">
-                <ExportPreview
-                  config={exportConfig}
-                  userProfile={{
-                    ...userProfile,
-                    bio:
-                      userProfile.bio ||
-                      "Full-stack developer passionate about building great user experiences.",
-                  }}
-                  stackSummary={{
-                    languages: topLanguages,
-                    topFrameworks: topFrameworks,
-                    mostActiveTime:
-                      new Date().getHours() < 12 ? "morning" : "afternoon",
-                    stats: {
-                      repositoryCount: repos.length,
-                      totalCommits: repos.reduce((sum, repo) => {
-                        // Use commit_count if available, otherwise fall back to watchers_count
-                        const commitCount = repo.commit_count || repo.watchers_count || 0;
-                        return sum + commitCount;
-                      }, 0),
-                      longestStreak: 0, // This would need to be calculated from commit history
-                      totalStars: repos.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0)
+        {/* Main content */}
+        <div className="flex-1 overflow-y-auto px-8 py-6">
+          <form className="space-y-10" onSubmit={(e) => e.preventDefault()}>
+            {/* Section toggles */}
+            <div>
+              <h3 className="text-xl font-bold mb-4">Content Sections</h3>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-4 bg-gray-50/70 rounded-xl border border-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={exportConfig.sections.identity}
+                    disabled={isExporting}
+                    onChange={(e) =>
+                      setExportConfig((cfg) => ({
+                        ...cfg,
+                        sections: {
+                          ...cfg.sections,
+                          identity: e.target.checked,
+                        },
+                      }))
                     }
-                  }}
-                  projects={projects}
-                />
+                    className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      Identity
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-tight">
+                      Your professional profile including name, bio, and GitHub
+                      profile link.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-4 bg-gray-50/70 rounded-xl border border-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={exportConfig.sections.stack}
+                    disabled={isExporting}
+                    onChange={(e) =>
+                      setExportConfig((cfg) => ({
+                        ...cfg,
+                        sections: {
+                          ...cfg.sections,
+                          stack: e.target.checked,
+                        },
+                      }))
+                    }
+                    className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      Tech Stack
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-tight">
+                      Your most-used programming languages and top technologies
+                      across all repositories.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-4 bg-gray-50/70 rounded-xl border border-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={exportConfig.sections.projects}
+                    disabled={isExporting}
+                    onChange={(e) =>
+                      setExportConfig((cfg) => ({
+                        ...cfg,
+                        sections: {
+                          ...cfg.sections,
+                          projects: e.target.checked,
+                        },
+                      }))
+                    }
+                    className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      Projects (max 3)
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-tight">
+                      Your selected projects with descriptions, tech stack, and
+                      key metrics.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Status Bar */}
-            <div className="mt-4 flex justify-between items-center text-sm text-gray-600">
-              <div>
-                {exportStatus === "generating" && (
-                  <span className="flex items-center">
-                    <FiRefreshCw className="animate-spin mr-2" />
-                    Generating PDF...
-                  </span>
-                )}
-                {exportStatus === "success" && (
-                  <span className="flex items-center text-green-600">
-                    <FiCheck className="mr-2" />
-                    PDF generated successfully!
-                  </span>
-                )}
-                {exportStatus === "error" && (
-                  <span className="text-red-600">
-                    Error generating PDF. Please try again.
-                  </span>
-                )}
+            {/* Project selection */}
+            <div>
+              <h3 className="text-xl font-bold mb-4">
+                Projects to Include{" "}
+                <span className="text-base text-gray-400">
+                  (max {exportConfig.maxProjects})
+                </span>
+              </h3>
+              <div
+                className="
+    p-3
+    border
+    rounded-lg
+    bg-gray-50/70
+    border-gray-200
+    max-h-56
+    overflow-y-hidden
+    hover:overflow-y-auto
+    transition-all
+    space-y-2
+    scrollbar-thin
+    scrollbar-thumb-gray-300
+    scrollbar-track-transparent
+  "
+                style={{
+                  minHeight: "56px",
+                }}
+              >
+                {repos.map((repo, idx) => (
+                  <label
+                    key={repo.id}
+                    className={`flex items-start gap-3 text-base px-2 py-2 rounded-lg transition-all ${
+                      selectedRepos.has(repo.id.toString())
+                        ? "bg-blue-50 border border-blue-100"
+                        : "hover:bg-gray-100"
+                    }`}
+                    style={{
+                      opacity:
+                        idx >= exportConfig.maxProjects &&
+                        !selectedRepos.has(repo.id.toString())
+                          ? 0.6
+                          : 1,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedRepos.has(repo.id.toString())}
+                      disabled={
+                        !selectedRepos.has(repo.id.toString()) &&
+                        selectedRepos.size >= exportConfig.maxProjects
+                      }
+                      onChange={() => handleToggleRepo(repo.id.toString())}
+                      className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                    />
+                    <div>
+                      <div className="font-semibold text-base">{repo.name}</div>
+                      {repo.description && (
+                        <div className="text-gray-500 text-xs mt-0.5">
+                          {repo.description}
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {repo.language && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {repo.language}
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-400 flex items-center">
+                          ⭐ {repo.stargazers_count}
+                        </span>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Additional options */}
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-4 bg-gray-50/70 rounded-xl border border-gray-200">
+                <input
+                  type="checkbox"
+                  checked={exportConfig.includeReadmeBullets}
+                  onChange={(e) =>
+                    setExportConfig((cfg) => ({
+                      ...cfg,
+                      includeReadmeBullets: e.target.checked,
+                    }))
+                  }
+                  disabled={isExporting}
+                  className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                />
+                <div>
+                  <div className="font-medium text-gray-900">
+                    AI README Bullets
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Include key points extracted from your project READMEs using
+                    AI.
+                  </p>
+                </div>
               </div>
 
-              <div className="space-x-3">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 border rounded-md hover:bg-gray-50"
+              <div className="flex items-start gap-3 p-4 bg-gray-50/70 rounded-xl border border-gray-200">
+                <input
+                  type="checkbox"
+                  checked={exportConfig.includeDeveloperSummary}
+                  onChange={(e) =>
+                    setExportConfig((cfg) => ({
+                      ...cfg,
+                      includeDeveloperSummary: e.target.checked,
+                    }))
+                  }
                   disabled={isExporting}
-                >
-                  Cancel
-                </button>
+                  className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                />
+                <div>
+                  <div className="font-medium text-gray-900">
+                    Developer Summary
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Add an AI-generated summary of your development experience
+                    and expertise.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* PDF Download Link */}
+            <PDFDownloadLink
+              key={pdfKey}
+              document={
+                <PdfDocument
+                  config={exportConfig}
+                  userProfile={{
+                    name: userProfile.name,
+                    avatarUrl: userProfile.avatar_url,
+                    githubUrl: userProfile.html_url,
+                    bio: userProfile.bio ?? null,
+                  }}
+                  projects={pdfProjects}
+                  stackSummary={stackSummary}
+                  generatedAt={generatedAt}
+                />
+              }
+              fileName="gitproof-export.pdf"
+              className="w-full mt-4"
+            >
+              {({ loading }) => (
                 <button
-                  onClick={handleExport}
-                  disabled={isExporting || isGeneratingAi}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                  type="button"
+                  disabled={loading || isExporting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
                 >
-                  {isExporting ? (
+                  {loading ? (
                     <>
                       <FiRefreshCw className="animate-spin" />
-                      Exporting...
+                      Generating PDF...
                     </>
                   ) : (
                     <>
                       <FiDownload />
-                      Export PDF
+                      Download PDF
                     </>
                   )}
                 </button>
-              </div>
-            </div>
-          </div>
+              )}
+            </PDFDownloadLink>
+
+            <p className="mt-5 text-base text-gray-400 text-center">
+              Your PDF will include all selected sections and projects.
+            </p>
+          </form>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default ExportModal;
