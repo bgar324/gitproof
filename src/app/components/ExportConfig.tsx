@@ -344,42 +344,9 @@ export default function ExportConfig({
 
         {expandedSections.appearance && (
           <div className="space-y-3 pl-4">
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={config.includeCommitHeatmap}
-                onChange={(e) =>
-                  updateConfig("includeCommitHeatmap", e.target.checked)
-                }
-                disabled={disabled || !config.sections.visuals}
-                className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <div>
-                <div>Commit Heatmap</div>
-                <p className="text-xs text-gray-500">
-                  Show your GitHub contribution activity
-                </p>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={config.includePieChart}
-                onChange={(e) =>
-                  updateConfig("includePieChart", e.target.checked)
-                }
-                disabled={disabled || !config.sections.visuals}
-                className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <div>
-                <div>Language Distribution</div>
-                <p className="text-xs text-gray-500">
-                  Show a pie chart of your top languages
-                </p>
-              </div>
-            </label>
-
+            <div className="text-sm text-gray-700 pb-2">
+              A statistics grid showing repository count, total commits, longest streak, and total stars will be included in the export.
+            </div>
             <label className="flex items-start gap-2 text-sm">
               <input
                 type="checkbox"

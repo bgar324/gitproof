@@ -41,8 +41,6 @@ export default function ExportModal({
     },
     maxProjects: 3,
     includeReadmeBullets: true,
-    includeCommitHeatmap: true,
-    includePieChart: true,
     includeDeveloperSummary: true,
     includeKeywords: false,
     includeTechStack: true,
@@ -272,6 +270,16 @@ export default function ExportModal({
                     topFrameworks: topFrameworks,
                     mostActiveTime:
                       new Date().getHours() < 12 ? "morning" : "afternoon",
+                    stats: {
+                      repositoryCount: repos.length,
+                      totalCommits: repos.reduce((sum, repo) => {
+                        // Use commit_count if available, otherwise fall back to watchers_count
+                        const commitCount = repo.commit_count || repo.watchers_count || 0;
+                        return sum + commitCount;
+                      }, 0),
+                      longestStreak: 0, // This would need to be calculated from commit history
+                      totalStars: repos.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0)
+                    }
                   }}
                   projects={projects}
                 />

@@ -228,31 +228,47 @@ export default function ExportPreview({
           )}
 
           {config.sections.visuals && (
-            <section>
-              <h2 className="text-2xl font-reckless font-extrabold mb-5 tracking-tight">
-                Development Activity
+            <section className="mt-10">
+              <h2 className="text-2xl font-reckless font-extrabold mb-5 tracking-tight text-gray-800">
+                Development Statistics
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {config.includeCommitHeatmap && (
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                    <h3 className="font-reckless mb-3 text-gray-700">
-                      Contribution Heatmap
-                    </h3>
-                    <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
-                      [Commit Heatmap Placeholder]
-                    </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Repository Count */}
+                <div className="bg-white p-5 rounded-lg border border-gray-100 shadow-sm transition-shadow duration-200">
+                  <div className="text-3xl font-bold text-black mb-1 font-reckless">
+                    {stackSummary.stats?.repositoryCount ?? 0}
                   </div>
-                )}
-                {config.includePieChart && (
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                    <h3 className="font-reckless mb-3 text-gray-700">
-                      Language Distribution
-                    </h3>
-                    <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
-                      [Pie Chart Placeholder]
-                    </div>
+                  <div className="text-sm font-medium text-gray-500 uppercase tracking-wider ">
+                    Repositories
                   </div>
-                )}
+                </div>
+                {/* Total Commits */}
+                <div className="bg-white p-5 rounded-lg border border-gray-100 shadow-sm transition-shadow duration-200">
+                  <div className="text-3xl font-bold text-black mb-1 font-reckless">
+                    {(stackSummary.stats?.totalCommits ?? 0).toLocaleString()}
+                  </div>
+                  <div className="text-sm font-medium text-gray-500 uppercase tracking-wider ">
+                    Total Commits
+                  </div>
+                </div>
+                {/* Longest Streak */}
+                <div className="bg-white p-5 rounded-lg border border-gray-100 shadow-sm transition-shadow duration-200">
+                  <div className="text-3xl font-bold text-black mb-1 font-reckless">
+                    {stackSummary.stats?.longestStreak ?? 0} days
+                  </div>
+                  <div className="text-sm font-medium text-gray-500 uppercase tracking-wider ">
+                    Longest Streak
+                  </div>
+                </div>
+                {/* Total Stars */}
+                <div className="bg-white p-5 rounded-lg border border-gray-100 shadow-sm transition-shadow duration-200">
+                  <div className="text-3xl font-bold text-black mb-1 font-reckless">
+                    {(stackSummary.stats?.totalStars ?? 0).toLocaleString()}
+                  </div>
+                  <div className="text-sm font-medium text-gray-500 uppercase tracking-wider ">
+                    Total Stars
+                  </div>
+                </div>
               </div>
             </section>
           )}

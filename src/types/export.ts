@@ -4,8 +4,8 @@ export type ExportConfig = {
   sections: Record<ExportSection, boolean>
   maxProjects: number
   includeReadmeBullets: boolean
-  includeCommitHeatmap: boolean
-  includePieChart: boolean
+  includeCommitHeatmap?: boolean  // Made optional as it's no longer used in the UI
+  includePieChart?: boolean      // Made optional as it's no longer used in the UI
   includeDeveloperSummary: boolean
   includeKeywords: boolean
   includeTechStack: boolean
@@ -30,4 +30,10 @@ export type StackSummary = {
   }>
   topFrameworks: string[]
   mostActiveTime: string
+  stats?: {
+    repositoryCount: number
+    totalCommits: number
+    longestStreak: number
+    totalStars: number
+  }
 }
