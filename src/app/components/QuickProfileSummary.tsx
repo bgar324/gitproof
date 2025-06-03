@@ -57,9 +57,10 @@ export default function QuickProfileSummary({
     };
 
     generateSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repos, created_at]);
 
-  if (loading) {
+  if (loading && !summary) {
     return (
       <div className="bg-white rounded-lg p-6 mb-6 animate-pulse">
         <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -67,8 +68,6 @@ export default function QuickProfileSummary({
       </div>
     );
   }
-
-  if (!summary) return null;
 
   return (
     <div className="space-y-6">
@@ -94,25 +93,7 @@ export default function QuickProfileSummary({
         </div>
       </div>
 
-      {/* Languages */}
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* <div className="notion-card p-6">
-          <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            Top Languages
-          </h4>
-          <div className="space-y-2">
-            {Object.entries(languages)
-              .sort(([,a], [,b]) => b - a)
-              .slice(0, 5)
-              .map(([lang, count]) => (
-                <div key={lang} className="flex items-center justify-between">
-                  <span>{lang}</span>
-                  <span className="text-sm text-gray-500">{count} repos</span>
-                </div>
-              ))}
-          </div>
-        </div> */}
         <div className="notion-card p-6">
           <h4 className="text-lg font-semibold mb-4">Top Languages</h4>
           <div className="flex flex-wrap gap-2">
@@ -127,8 +108,6 @@ export default function QuickProfileSummary({
               ))}
           </div>
         </div>
-
-        {/* Most Used Language */}
         <div className="notion-card p-6">
           <h4 className="text-lg font-semibold mb-4">Most Used Language</h4>
           {Object.entries(languages)
@@ -145,12 +124,92 @@ export default function QuickProfileSummary({
         </div>
       </div>
 
-      {/* Summary */}
+      {/* Quick Profile Summary Card */}
       <div className="notion-card p-6">
-        <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          Quick Profile Summary ✨
-        </h4>
-        <p className="text-gray-600">{summary}</p>
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-lg font-semibold flex items-center gap-2">
+            Quick Profile Summary ✨
+          </h4>
+          {summary ? (
+            <button
+              onClick={() => {
+                localStorage.removeItem("quickProfileSummary");
+                setSummary("");
+              }}
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm font-medium transition-colors duration-200 hover:shadow-sm"
+              title="Clear cached summary"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>Clear Cache</span>
+            </button>
+          ) : null}
+        </div>
+        {summary ? (
+          <p className="text-gray-600">{summary}</p>
+        ) : (
+          <div className="flex justify-between items-center">
+            <div></div> {/* Empty div to balance the flex layout */}
+          <button
+            onClick={async () => {
+              setLoading(true);
+              try {
+                const response = await fetch("/api/ai/quick-summary", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ repos, created_at }),
+                });
+                if (response.ok) {
+                  const data = await response.json();
+                  setSummary(data.summary);
+                  localStorage.setItem("quickProfileSummary", data.summary);
+                }
+              } catch (e) {}
+              setLoading(false);
+            }}
+            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-black/90 flex items-center gap-2 text-sm font-medium transition-colors duration-200 hover:shadow-sm font-reckless"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <svg
+                  className="animate-spin h-4 w-4 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                <span>Generating...</span>
+              </>
+            ) : (
+              "Generate Insights"
+            )}
+          </button>
+          </div>
+        )}
       </div>
     </div>
   );

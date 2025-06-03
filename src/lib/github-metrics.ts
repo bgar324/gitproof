@@ -7,6 +7,7 @@ type PullResponse = RestEndpointMethodTypes['pulls']['list']['response']['data']
 
 interface ReadmeMetrics {
   word_count: number;
+  content: string;
   sections: {
     name: string;
     content_length: number;
@@ -125,6 +126,7 @@ export async function getDetailedRepoMetrics(
     has_readme: readmeMetrics !== null,
     readme_metrics: readmeMetrics || {
       word_count: 0,
+      content: '',
       sections: [],
       critical_sections: {
         installation: false,
@@ -234,6 +236,7 @@ async function analyzeReadme(
 
     return {
       word_count: content.split(/\s+/).length,
+      content: content,
       sections,
       critical_sections: criticalSections,
       formatting,

@@ -124,6 +124,7 @@ ${repoDetails
       size: number;
       topics: string[];
       has_readme: boolean;
+      readme_metrics: any;
       commit_count: number;
       contributors: number;
       is_fork: boolean;
@@ -139,10 +140,13 @@ ${repoDetails
   * Size: ${repo.size}KB
   * Topics: ${repo.topics.join(", ") || "None"}
   * Has README: ${repo.has_readme}
+  * README Quality Score: ${repo.readme_metrics?.overall_score || 'N/A'}/100
+  * README Sections: ${repo.readme_metrics?.sections?.map((s: any) => s.name).join(", ") || 'None'}
   * Commits: ${repo.commit_count}
   * Contributors: ${repo.contributors}
   * Is Fork: ${repo.is_fork}
   * Open Issues: ${repo.open_issues}
+  * README Content (first 1000 chars): ${repo.readme_metrics ? `"""${repo.readme_metrics.content?.substring(0, 1000) || 'No content available'}"""` : 'Not available'}
 `
   )
   .join("")}

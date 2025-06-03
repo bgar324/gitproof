@@ -1,16 +1,11 @@
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useRef } from "react";
 import type {
   ExportConfig,
   ProjectExport,
   StackSummary,
-} from "@/types/export";
-import { GitHubRepo } from "@/types/github";
-import { fetchAllCommits, calculateLongestStreak as calculateStreak } from "@/lib/github-utils";
-import { calculateLanguagePercentages, getLastCodedDate, formatDateRange, formatLastCoded } from "@/lib/repo-utils";
+} from "../../types/export";
+import { FiGithub, FiStar, FiGitBranch, FiCalendar } from "react-icons/fi";
 import Image from "next/image";
-import { FiGithub, FiLink, FiStar, FiGitBranch, FiRefreshCw, FiCode, FiGlobe } from "react-icons/fi";
-import { toast } from "react-hot-toast";
-import { useSession } from "next-auth/react";
 
 type ExportPreviewProps = {
   config: ExportConfig;
@@ -31,113 +26,11 @@ export default function ExportPreview({
   projects,
 }: ExportPreviewProps) {
   const previewRef = useRef<HTMLDivElement>(null);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [cachedStreak, setCachedStreak] = useState<number | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('longestCommitStreak');
-      return saved ? parseInt(saved, 10) : null;
-    }
-    return null;
-  });
-  const [repoLanguages, setRepoLanguages] = useState<Record<string, Record<string, number>>>({});
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", { year: "numeric", month: "long" });
   };
-
-  const { data: session } = useSession();
-
-  const calculateLongestStreak = async (): Promise<number> => {
-    setIsCalculating(true);
-    toast.loading('Calculating your commit streak...', { id: 'streak-calc' });
-    
-    try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Generate a random streak between 1 and 365 days
-      const randomStreak = Math.floor(Math.random() * 365) + 1;
-      
-      // Cache the result
-      localStorage.setItem('longestCommitStreak', randomStreak.toString());
-      setCachedStreak(randomStreak);
-      
-      toast.success(`Found a ${randomStreak}-day commit streak!`, { id: 'streak-calc' });
-      return randomStreak;
-    } catch (error) {
-      console.error('Error calculating commit streak:', error);
-      toast.error('Failed to calculate commit streak. Using cached value if available.', { id: 'streak-calc' });
-      return cachedStreak ?? 0;
-    } finally {
-      setIsCalculating(false);
-    }
-  };
-
-  const handleCalculateStreak = async () => {
-    const streak = await calculateLongestStreak();
-    setCachedStreak(streak);
-  };
-
-  // Calculate total commits from all projects (using stargazers_count as a fallback)
-  const totalCommits = projects.reduce(
-    (sum, project) => sum + (project.commit_count || project.stargazers_count || 0),
-    0
-  );
-  
-  // Calculate last coded date
-  const lastCodedDate = useMemo(() => {
-    if (!projects.length) return null;
-    const sorted = [...projects].sort((a, b) => 
-      new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime()
-    );
-    return new Date(sorted[0].pushed_at);
-  }, [projects]);
-  
-  // Get member since date from the oldest repository
-  const memberSinceDate = useMemo(() => {
-    if (!projects.length) return null;
-    const sorted = [...projects].sort((a, b) => 
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-    return new Date(sorted[0].created_at);
-  }, [projects]);
-  
-  // Fetch languages for each project
-  useEffect(() => {
-    const fetchLanguages = async () => {
-      if (!projects.length || !session?.accessToken) return;
-      
-      const newRepoLanguages: Record<string, Record<string, number>> = {};
-      
-      await Promise.all(
-        projects.map(async (project) => {
-          try {
-            const response = await fetch(project.languages_url, {
-              headers: {
-                Authorization: `Bearer ${session.accessToken}`,
-                'Accept': 'application/vnd.github.v3+json',
-              },
-            });
-            
-            if (response.ok) {
-              const languages = await response.json();
-              newRepoLanguages[project.id] = calculateLanguagePercentages(languages);
-            }
-          } catch (error) {
-            console.error(`Error fetching languages for ${project.name}:`, error);
-          }
-        })
-      );
-      
-      setRepoLanguages(prev => ({
-        ...prev,
-        ...newRepoLanguages
-      }));
-    };
-    
-    fetchLanguages();
-  }, [projects, session?.accessToken]);
 
   const currentYear = new Date().getFullYear();
 
@@ -257,19 +150,7 @@ export default function ExportPreview({
                   <div className="text-xs text-gray-500 font-medium">
                     Member Since
                   </div>
-                  <div>
-                    {memberSinceDate 
-                      ? `${memberSinceDate.getFullYear()} – Present`
-                      : 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 font-medium">
-                    Last Coded
-                  </div>
-                  <div>
-                    {lastCodedDate ? formatLastCoded(lastCodedDate) : 'N/A'}
-                  </div>
+                  <div>2018 – Present</div>
                 </div>
               </div>
             </section>
@@ -289,95 +170,24 @@ export default function ExportPreview({
                     key={project.id}
                     className="border border-gray-100 rounded-lg p-5"
                   >
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="text-lg font-reckless font-semibold">
-                            <a
-                              href={project.html_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline"
-                            >
-                              {project.name}
-                            </a>
-                          </h3>
-                          {project.summary && (
-                            <p className="mt-1 text-gray-700 text-sm">
-                              {project.summary}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2 text-sm text-gray-500">
-                          <span className="flex items-center">
-                            <FiStar className="mr-1" />
-                            {project.stargazers_count?.toLocaleString() || 0}
-                          </span>
-                          <span className="flex items-center">
-                            <FiGitBranch className="mr-1" />
-                            {project.forks_count?.toLocaleString() || 0}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Repository Stats and Links */}
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-100 mt-2">
-                        <div className="flex items-center space-x-4 text-sm text-gray-500">
-                          {project.language && (
-                            <div className="flex items-center">
-                              <span className="w-2 h-2 rounded-full bg-blue-500 mr-1.5"></span>
-                              {project.language}
-                            </div>
-                          )}
-                          {project.homepage && (
-                            <a 
-                              href={project.homepage} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center hover:text-blue-600"
-                              title="Project Website"
-                            >
-                              <FiGlobe className="mr-1" />
-                              Website
-                            </a>
-                          )}
-                        </div>
-                        
-                        <div className="flex space-x-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-reckless font-semibold">
                           <a
-                            href={project.html_url}
+                            href={project.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-gray-500 hover:text-blue-600 flex items-center"
-                            title="View on GitHub"
+                            className="hover:underline text-black"
                           >
-                            <FiGithub className="mr-1" />
-                            GitHub
+                            {project.name}
                           </a>
-                        </div>
+                        </h3>
+                        {project.summary && (
+                          <p className="mt-1 text-gray-700">
+                            {project.summary}
+                          </p>
+                        )}
                       </div>
-                      
-                      {/* Tech Stack */}
-                      {repoLanguages[project.id] && (
-                        <div className="pt-2">
-                          <div className="text-xs text-gray-500 font-medium mb-1">Tech Stack</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {Object.entries(repoLanguages[project.id])
-                              .sort((a, b) => b[1] - a[1])
-                              .slice(0, 5)
-                              .map(([language, percentage]) => (
-                                <div 
-                                  key={language} 
-                                  className="flex items-center text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full"
-                                  title={`${language} (${percentage.toFixed(1)}%)`}
-                                >
-                                  <span className="font-medium text-gray-700">{language}</span>
-                                  <span className="ml-1 text-gray-400 text-xs">{Math.round(percentage)}%</span>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
                       <div className="flex flex-col gap-2 items-end min-w-fit">
                         {project.stars > 0 && (
                           <span className="flex items-center gap-1 text-xs text-gray-500">
@@ -418,64 +228,31 @@ export default function ExportPreview({
           )}
 
           {config.sections.visuals && (
-            <section className="mt-10">
-              <h2 className="text-2xl font-reckless font-extrabold mb-5 tracking-tight text-gray-800">
-                Development Statistics
+            <section>
+              <h2 className="text-2xl font-reckless font-extrabold mb-5 tracking-tight">
+                Development Activity
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Repository Count */}
-                <div className="bg-white p-5 rounded-lg border border-gray-100 shadow-sm transition-shadow duration-200">
-                  <div className="text-3xl font-bold text-black mb-1 font-reckless">
-                    {stackSummary.stats?.repositoryCount ?? 0}
-                  </div>
-                  <div className="text-sm font-medium text-gray-500 uppercase tracking-wider ">
-                    Repositories
-                  </div>
-                </div>
-                {/* Total Commits */}
-                <div className="bg-white p-5 rounded-lg border border-gray-100 shadow-sm transition-shadow duration-200">
-                  <div className="text-3xl font-bold text-black mb-1 font-reckless">
-                    {(stackSummary.stats?.totalCommits ?? 0).toLocaleString()}
-                  </div>
-                  <div className="text-sm font-medium text-gray-500 uppercase tracking-wider ">
-                    Total Commits
-                  </div>
-                </div>
-                {/* Longest Streak */}
-                <div className="bg-white p-5 rounded-lg border border-gray-100 shadow-sm transition-shadow duration-200">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="text-3xl font-bold text-black mb-1 font-reckless">
-                        {cachedStreak ?? (stackSummary.stats?.longestStreak ?? 0)} days
-                      </div>
-                      <div className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-                        Longest Streak
-                      </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {config.includeCommitHeatmap && (
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                    <h3 className="font-reckless mb-3 text-gray-700">
+                      Contribution Heatmap
+                    </h3>
+                    <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
+                      [Commit Heatmap Placeholder]
                     </div>
-                    <button
-                      onClick={handleCalculateStreak}
-                      disabled={isCalculating}
-                      className={`p-2 rounded-full ${isCalculating ? 'text-gray-400' : 'text-gray-600 hover:bg-gray-100'}`}
-                      title="Calculate commit streak"
-                    >
-                      <FiRefreshCw className={`w-4 h-4 ${isCalculating ? 'animate-spin' : ''}`} />
-                    </button>
                   </div>
-                  {!cachedStreak && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Click the refresh icon to calculate your longest commit streak
-                    </p>
-                  )}
-                </div>
-                {/* Total Stars */}
-                <div className="bg-white p-5 rounded-lg border border-gray-100 shadow-sm transition-shadow duration-200">
-                  <div className="text-3xl font-bold text-black mb-1 font-reckless">
-                    {(stackSummary.stats?.totalStars ?? 0).toLocaleString()}
+                )}
+                {config.includePieChart && (
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                    <h3 className="font-reckless mb-3 text-gray-700">
+                      Language Distribution
+                    </h3>
+                    <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
+                      [Pie Chart Placeholder]
+                    </div>
                   </div>
-                  <div className="text-sm font-medium text-gray-500 uppercase tracking-wider ">
-                    Total Stars
-                  </div>
-                </div>
+                )}
               </div>
             </section>
           )}

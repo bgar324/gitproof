@@ -104,74 +104,119 @@ export default function ExportModal({
     setIsExporting(true);
 
     try {
-      // Create a new PDF with better formatting
+      // Wait for fonts to load
+      await document.fonts.ready;
+      
+      // Calculate dimensions for A4 at 96 DPI
+      const targetWidth = 8.27 * 96; // A4 width in pixels at 96 DPI
+      const targetHeight = 11.69 * 96; // A4 height in pixels at 96 DPI
+
+      // Create a style element for PDF-specific styles
+      const style = document.createElement('style');
+      style.textContent = `
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Reckless:wght@400;500;600;700&display=swap');
+        #export-preview {
+          width: ${targetWidth}px !important;
+          min-height: ${targetHeight}px !important;
+          background: white !important;
+          padding: 40px !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+        }
+        #export-preview * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        .project-card {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        .tech-stack {
+          flex-wrap: nowrap !important;
+        }
+        .tech-pill {
+          white-space: nowrap !important;
+        }
+      `;
+      
+      // Store original styles
+      const originalStyles = {
+        width: element.style.width,
+        minWidth: element.style.minWidth,
+        maxWidth: element.style.maxWidth,
+        height: element.style.height,
+        minHeight: element.style.minHeight,
+        maxHeight: element.style.maxHeight,
+        padding: element.style.padding,
+        boxShadow: element.style.boxShadow,
+        borderRadius: element.style.borderRadius,
+      };
+
+      // Apply PDF-specific styles
+      element.style.width = `${targetWidth}px`;
+      element.style.minWidth = `${targetWidth}px`;
+      element.style.maxWidth = `${targetWidth}px`;
+      element.style.height = 'auto';
+      element.style.overflow = 'visible';
+      element.style.padding = '40px';
+      element.style.boxShadow = 'none';
+      element.style.borderRadius = '0';
+
+      // Add the style to the document
+      document.head.appendChild(style);
+      
+      // Render to canvas with html2canvas
+      const canvas = await html2canvas(element as HTMLElement, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true,
+        logging: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: targetWidth,
+        width: targetWidth,
+        height: element.scrollHeight,
+        onclone: (clonedDoc: Document) => {
+          // Apply the same styles to the cloned document
+          clonedDoc.head.appendChild(style.cloneNode(true));
+          const clonedElement = clonedDoc.getElementById('export-preview');
+          if (clonedElement) {
+            clonedElement.classList.add('pdf-exporting');
+          }
+        },
+      } as any); // Using 'as any' to bypass TypeScript type checking for html2canvas options
+
+      // Clean up
+      document.head.removeChild(style);
+      element.classList.remove('pdf-exporting');
+      
+      // Restore original styles
+      Object.assign(element.style, originalStyles);
+
+      // Create PDF
       const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
       });
 
-      // Get the dimensions of the page
-      const pageWidth = pdf.internal.pageSize.getWidth();
-
-      // Calculate scale factor for better quality
-      const scale = 2; // Higher scale for better quality
-      const width = element.offsetWidth;
-      const height = element.offsetHeight;
-
-      // Create a canvas with higher resolution
-      const canvas = document.createElement("canvas");
-      canvas.width = width * scale;
-      canvas.height = height * scale;
-
-      // Set canvas style dimensions to maintain size
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-
-      // Get 2D context and scale it
-      const context = canvas.getContext("2d");
-      if (context) {
-        context.scale(scale, scale);
-      }
-
-      // Render to canvas with type assertion for html2canvas options
-      await html2canvas(element, {
-        canvas,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-        scrollY: -window.scrollY,
-        allowTaint: true,
-        imageTimeout: 0,
-        width,
-        height,
-        x: 0,
-        y: 0,
-        scale: 1, // We're handling scaling manually
-      } as any); // Type assertion to bypass type checking for html2canvas options
-
-      // Calculate dimensions to maintain aspect ratio
-      const imgData = canvas.toDataURL("image/png");
-      const imgWidth = pageWidth - 20; // Add margins
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
+      // Add image to PDF
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
       // Add the image to the PDF
-      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
-
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      
       // Save the PDF
-      pdf.save(
-        `${
-          userProfile.name?.replace(/\s+/g, "-").toLowerCase() || "github"
-        }-profile.pdf`
-      );
-      setExportStatus("success");
+      pdf.save('gitproof-export.pdf');
+      setExportStatus('success');
     } catch (error) {
-      console.error("Error generating PDF:", error);
-      setExportStatus("error");
+      console.error('Error generating PDF:', error);
+      setExportStatus('error');
     } finally {
       setIsExporting(false);
-      // Reset status after 3 seconds
-      setTimeout(() => setExportStatus("idle"), 3000);
     }
   };
 
@@ -231,6 +276,38 @@ export default function ExportModal({
   }, [repos]);
 
   if (!open) return null;
+
+  // Render export status message
+  const renderExportStatus = () => {
+    if (exportStatus === 'generating') {
+      return (
+        <div className="flex items-center space-x-2 text-blue-600">
+          <FiRefreshCw className="animate-spin" />
+          <span>Generating PDF...</span>
+        </div>
+      );
+    }
+    
+    if (exportStatus === 'success') {
+      return (
+        <div className="flex items-center space-x-2 text-green-600">
+          <FiCheck className="text-xl" />
+          <span>PDF generated successfully!</span>
+        </div>
+      );
+    }
+    
+    if (exportStatus === 'error') {
+      return (
+        <div className="flex items-center space-x-2 text-red-600">
+          <FiX className="text-xl" />
+          <span>Failed to generate PDF. Please try again.</span>
+        </div>
+      );
+    }
+    
+    return null;
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">

@@ -140,6 +140,7 @@ export async function POST(request: Request) {
         ]
           .filter(Boolean)
           .join(", ")}
+        - README Preview: """${repo.readme_metrics?.content?.substring(0, 1000) || 'No README content available'}"""
       `
         )
         .join("")}
