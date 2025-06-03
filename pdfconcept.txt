@@ -1,0 +1,70 @@
+PDF Export – Summary of All Desired Features/Behaviors for GitProof
+
+User customizes what sections to include in the PDF:
+
+Identity (name, avatar, bio, GitHub URL)
+
+Stack summary (top languages, frameworks, stack % breakdown)
+
+Top projects (user can select specific repos to showcase)
+
+For each project: title, summary, tags, optionally AI-generated résumé bullets
+
+Visuals (commit heatmap, pie charts, graphs)
+
+Keywords (optionally)
+
+README quality or AI-suggested README preview (optional)
+
+Live export preview (WYSIWYG):
+
+Users see an accurate, up-to-date preview before downloading.
+
+All layout/styling matches what will be exported.
+
+PDF export captures only the current state of the preview (user curation applies)
+
+Export is not limited to all public repos; user selects which to include (with sensible defaults)
+
+PDF export triggers:
+
+User opens export modal (PDF curation UI appears)
+
+User customizes selection, toggles sections, and sets project count
+
+User clicks “Export” to generate/download PDF
+
+Export process:
+
+Uses html2canvas + jsPDF (or equivalent) to render the previewed content as PDF, pixel-perfect
+
+Images, icons, charts are rendered at high quality (2x scale, no blurry outputs)
+
+PDF respects page boundaries, with proper content scaling and pagination if needed
+
+PDF filename reflects the user’s GitHub handle or name
+
+AI-integration:
+
+If enabled, PDF includes AI-suggested résumé bullets for projects
+
+Optionally, shows AI “developer type” summary at the top (e.g., “Python and HTML heavy in 2022, transitioned to React in 2024”)
+
+Can recommend which projects to feature, with explanation/justification
+
+README improvement feature:
+
+If a repo’s README is too short, an icon/notice appears
+
+User can one-click “generate AI README” and see a suggestion
+
+Optionally, suggested README can be shown inline or added to the PDF
+
+PDF can be downloaded or stored in cloud (Supabase S3 etc) for persistent user access
+
+All export logic and config lives in dedicated export components (no business logic in Dashboard/page)
+
+All features work on both desktop and mobile
+
+Summary
+The GitProof PDF export is a highly customizable, WYSIWYG feature allowing users to curate which profile sections and repositories appear in their exported résumé-ready PDF. It includes AI-driven recommendations, section toggling, preview, and best-practice rendering. All logic is encapsulated in modular export components, with a focus on high-fidelity output and flexible UX.

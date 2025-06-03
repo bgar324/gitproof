@@ -437,7 +437,7 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
             {isReadmeTooShort && (
               <button
                 onClick={() => setIsReadmePreviewOpen(true)}
-                className="text-amber-500 hover:text-amber-600 transition-colors"
+                className="text-amber-500 hover:text-amber-600 transition-colors cursor-help"
                 title="This README is too short (under 100 characters). Click to generate a better one."
               >
                 <FiAlertTriangle className="w-4 h-4" />

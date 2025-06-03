@@ -92,7 +92,7 @@ export default function ReadmeStatus({
         <div className="flex items-start">
           <div className="flex-shrink-0 pt-0.5">
             <FiAlertTriangle
-              className="h-5 w-5 text-amber-500"
+              className="h-5 w-5 text-amber-500 cursor-help"
               aria-hidden="true"
             />
           </div>

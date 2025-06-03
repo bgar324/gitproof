@@ -6,6 +6,7 @@ import type { ExportConfig, ExportSection } from '../types/export'
 type ExportConfigProps = {
   onConfigChange: (config: ExportConfig) => void
   onExport: () => void
+  disabled?: boolean;
 }
 
 const defaultConfig: ExportConfig = {
@@ -22,7 +23,7 @@ const defaultConfig: ExportConfig = {
   includePieChart: true
 }
 
-export default function ExportConfig({ onConfigChange, onExport }: ExportConfigProps) {
+export default function ExportConfig({ onConfigChange, onExport, disabled }: ExportConfigProps) {
   const [config, setConfig] = useState<ExportConfig>(defaultConfig)
 
   const toggleSection = (section: ExportSection) => {
