@@ -1,7 +1,16 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { FiAlertTriangle, FiCopy, FiCheck, FiRefreshCw, FiX } from 'react-icons/fi';
+import { useState } from "react";
+import {
+  FiAlertTriangle,
+  FiCopy,
+  FiCheck,
+  FiRefreshCw,
+  FiX,
+} from "react-icons/fi";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 
 interface ReadmeStatusProps {
   readmeContent: string;
@@ -11,24 +20,32 @@ interface ReadmeStatusProps {
   repoUrl: string;
 }
 
-export default function ReadmeStatus({ readmeContent, repoName, description, languages, repoUrl }: ReadmeStatusProps) {
+export default function ReadmeStatus({
+  readmeContent,
+  repoName,
+  description,
+  languages,
+  repoUrl,
+}: ReadmeStatusProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedReadme, setGeneratedReadme] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'copied'>('idle');
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copying" | "copied">(
+    "idle"
+  );
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  
+
   const charCount = readmeContent ? readmeContent.length : 0;
   const isReadmeInsufficient = charCount < 100; // Consider READMEs with less than 100 characters as insufficient
 
   const generateReadme = async () => {
     if (isGenerating) return;
-    
+
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/ai/generate-readme', {
-        method: 'POST',
+      const response = await fetch("/api/ai/generate-readme", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           repoName,
@@ -39,15 +56,15 @@ export default function ReadmeStatus({ readmeContent, repoName, description, lan
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate README');
+        throw new Error("Failed to generate README");
       }
 
       const data = await response.json();
       setGeneratedReadme(data.readme);
       setIsPreviewOpen(true);
     } catch (error) {
-      console.error('Error generating README:', error);
-      alert('Failed to generate README. Please try again.');
+      console.error("Error generating README:", error);
+      alert("Failed to generate README. Please try again.");
     } finally {
       setIsGenerating(false);
     }
@@ -55,15 +72,15 @@ export default function ReadmeStatus({ readmeContent, repoName, description, lan
 
   const copyToClipboard = async () => {
     if (!generatedReadme) return;
-    
-    setCopyStatus('copying');
+
+    setCopyStatus("copying");
     try {
       await navigator.clipboard.writeText(generatedReadme);
-      setCopyStatus('copied');
-      setTimeout(() => setCopyStatus('idle'), 2000);
+      setCopyStatus("copied");
+      setTimeout(() => setCopyStatus("idle"), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
-      setCopyStatus('idle');
+      console.error("Failed to copy:", err);
+      setCopyStatus("idle");
     }
   };
 
@@ -74,7 +91,10 @@ export default function ReadmeStatus({ readmeContent, repoName, description, lan
       <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
         <div className="flex items-start">
           <div className="flex-shrink-0 pt-0.5">
-            <FiAlertTriangle className="h-5 w-5 text-amber-500" aria-hidden="true" />
+            <FiAlertTriangle
+              className="h-5 w-5 text-amber-500"
+              aria-hidden="true"
+            />
           </div>
           <div className="ml-3 flex-1">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -83,7 +103,8 @@ export default function ReadmeStatus({ readmeContent, repoName, description, lan
                   README Needs Improvement
                 </h3>
                 <p className="text-xs text-amber-700 mt-0.5">
-                  This README is only {charCount} characters long. A good README should be at least 100 characters.
+                  This README is only {charCount} characters long. A good README
+                  should be at least 100 characters.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -98,7 +119,7 @@ export default function ReadmeStatus({ readmeContent, repoName, description, lan
                       Generating...
                     </>
                   ) : (
-                    'Generate README'
+                    "Generate README"
                   )}
                 </button>
                 {generatedReadme && (
@@ -126,15 +147,15 @@ export default function ReadmeStatus({ readmeContent, repoName, description, lan
               <div className="flex items-center gap-2">
                 <button
                   onClick={copyToClipboard}
-                  disabled={copyStatus !== 'idle'}
+                  disabled={copyStatus !== "idle"}
                   className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {copyStatus === 'copied' ? (
+                  {copyStatus === "copied" ? (
                     <>
                       <FiCheck className="h-3.5 w-3.5 mr-1.5" />
                       Copied!
                     </>
-                  ) : copyStatus === 'copying' ? (
+                  ) : copyStatus === "copying" ? (
                     <>
                       <FiRefreshCw className="animate-spin h-3.5 w-3.5 mr-1.5" />
                       Copying...
@@ -156,9 +177,12 @@ export default function ReadmeStatus({ readmeContent, repoName, description, lan
             </div>
             <div className="flex-1 overflow-auto p-6">
               <div className="prose prose-sm max-w-none">
-                <pre className="whitespace-pre-wrap font-mono text-sm bg-gray-50 p-4 rounded-lg overflow-x-auto">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw]}
+                >
                   {generatedReadme}
-                </pre>
+                </ReactMarkdown>
               </div>
             </div>
             <div className="border-t border-gray-200 px-6 py-3 bg-gray-50 rounded-b-lg flex justify-end">

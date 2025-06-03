@@ -1,6 +1,12 @@
 // RepoCard.tsx
 "use client";
 
+function decodeBase64Utf8(base64:any) {
+  const binary = atob(base64);
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
 import { useEffect, useState, useCallback } from "react";
 import ReadmePreview from "./ReadmePreview";
 import ReadmeStatus from "./ReadmeStatus";
@@ -112,7 +118,7 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
       setIsReadmeLoading(true);
       setIsLoadingLanguages(true);
       try {
-        // Fetch README
+        // Fetch README and languages in parallel
         const [readmeResponse, languagesResponse] = await Promise.all([
           fetch(
             `https://api.github.com/repos/${repo.owner.login}/${repo.name}/readme`,
@@ -134,10 +140,20 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
           ),
         ]);
 
+        // README fetch logic
         if (readmeResponse.ok) {
-          const readmeData = await readmeResponse.json();
-          const decodedContent = atob(readmeData.content);
-          setReadmeContent(decodedContent);
+          const contentType = readmeResponse.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            const readmeData = await readmeResponse.json();
+            const decodedContent = decodeBase64Utf8(readmeData.content);
+            console.log("DECODED README", decodedContent.slice(0, 100)); // <--- put this line here
+            setReadmeContent(decodedContent);
+          } else {
+            const rawMarkdown = await readmeResponse.text();
+            setReadmeContent(rawMarkdown);
+          }
+        } else {
+          setReadmeContent(null);
         }
 
         if (languagesResponse.ok) {
@@ -519,10 +535,8 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
             </div>
 
             {isReadmePreviewOpen && (
-              <div className="bg-white rounded-md p-3 overflow-auto max-h-80 border border-gray-100 shadow-inner">
-                <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono">
-                  {readmeContent}
-                </pre>
+              <div className="bg-white rounded-md p-4 overflow-auto max-h-96 border border-gray-100 shadow-inner">
+                <ReadmePreview content={readmeContent} className="text-sm" />
               </div>
             )}
             <div className="mt-2 pt-2 border-t border-gray-100">
