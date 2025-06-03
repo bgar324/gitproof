@@ -253,7 +253,7 @@ export default function DashboardPage() {
       <div className="flex-shrink-0">
         <Sidebar />
       </div>
-      <div className="flex-1 overflow-y-auto h-screen px-6 py-2">
+      <div className="flex-1 overflow-y-auto h-screen px-12 py-2">
         <div className="notion-card p-6 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
