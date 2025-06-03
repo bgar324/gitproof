@@ -14,13 +14,29 @@ export type ExportConfig = {
 export type ProjectExport = {
   id: string | number
   name: string
+  full_name: string
   summary: string
+  description: string | null
   tags: string[]
   bullets: string[]
   url: string
+  html_url: string
   language: string | null
+  languages_url: string
   stars: number
+  stargazers_count: number
+  forks_count: number
+  commit_count?: number
+  pushed_at: string
+  created_at: string
+  updated_at: string
   hasReadme?: boolean
+  homepage?: string | null
+  owner: {
+    login: string
+    avatar_url: string
+    html_url: string
+  }
 }
 
 export type StackSummary = {

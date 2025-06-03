@@ -186,15 +186,29 @@ export default function ExportModal({
       .map((repo) => ({
         id: repo.id.toString(),
         name: repo.name,
+        full_name: repo.full_name,
         summary: repo.description || "",
-        tags: [repo.language, ...(repo.topics || [])].filter(
-          Boolean
-        ) as string[],
+        description: repo.description,
+        tags: [repo.language, ...(repo.topics || [])].filter(Boolean) as string[],
         bullets: aiSummaries[repo.name] ? [aiSummaries[repo.name]] : [],
         url: repo.html_url,
+        html_url: repo.html_url,
         language: repo.language,
+        languages_url: repo.languages_url,
         stars: repo.stargazers_count,
+        stargazers_count: repo.stargazers_count,
+        forks_count: repo.forks_count,
+        commit_count: repo.commit_count,
+        pushed_at: repo.pushed_at,
+        created_at: repo.created_at,
+        updated_at: repo.updated_at,
         hasReadme: true,
+        homepage: repo.homepage || null,
+        owner: {
+          login: repo.owner?.login || '',
+          avatar_url: repo.owner?.avatar_url || '',
+          html_url: repo.owner?.html_url || ''
+        }
       }));
   }, [repos, selectedRepos, exportConfig.maxProjects, aiSummaries]);
 

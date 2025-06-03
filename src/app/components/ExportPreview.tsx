@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import type {
   ExportConfig,
   ProjectExport,
@@ -6,8 +6,9 @@ import type {
 } from "@/types/export";
 import { GitHubRepo } from "@/types/github";
 import { fetchAllCommits, calculateLongestStreak as calculateStreak } from "@/lib/github-utils";
+import { calculateLanguagePercentages, getLastCodedDate, formatDateRange, formatLastCoded } from "@/lib/repo-utils";
 import Image from "next/image";
-import { FiGithub, FiLink, FiStar, FiGitBranch, FiRefreshCw } from "react-icons/fi";
+import { FiGithub, FiLink, FiStar, FiGitBranch, FiRefreshCw, FiCode, FiGlobe } from "react-icons/fi";
 import { toast } from "react-hot-toast";
 import { useSession } from "next-auth/react";
 
@@ -31,15 +32,14 @@ export default function ExportPreview({
 }: ExportPreviewProps) {
   const previewRef = useRef<HTMLDivElement>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-  const [cachedStreak, setCachedStreak] = useState<number | null>(null);
-
-  // Load cached streak on component mount
-  useEffect(() => {
-    const savedStreak = localStorage.getItem('longestCommitStreak');
-    if (savedStreak) {
-      setCachedStreak(parseInt(savedStreak, 10));
+  const [cachedStreak, setCachedStreak] = useState<number | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('longestCommitStreak');
+      return saved ? parseInt(saved, 10) : null;
     }
-  }, []);
+    return null;
+  });
+  const [repoLanguages, setRepoLanguages] = useState<Record<string, Record<string, number>>>({});
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -76,13 +76,68 @@ export default function ExportPreview({
 
   const handleCalculateStreak = async () => {
     const streak = await calculateLongestStreak();
-    // Update the parent component's state if needed
-    if (streak > 0 && stackSummary.stats) {
-      // You would typically update the parent component's state here
-      // For now, we'll just update our local state
-      setCachedStreak(streak);
-    }
+    setCachedStreak(streak);
   };
+
+  // Calculate total commits from all projects (using stargazers_count as a fallback)
+  const totalCommits = projects.reduce(
+    (sum, project) => sum + (project.commit_count || project.stargazers_count || 0),
+    0
+  );
+  
+  // Calculate last coded date
+  const lastCodedDate = useMemo(() => {
+    if (!projects.length) return null;
+    const sorted = [...projects].sort((a, b) => 
+      new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime()
+    );
+    return new Date(sorted[0].pushed_at);
+  }, [projects]);
+  
+  // Get member since date from the oldest repository
+  const memberSinceDate = useMemo(() => {
+    if (!projects.length) return null;
+    const sorted = [...projects].sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    return new Date(sorted[0].created_at);
+  }, [projects]);
+  
+  // Fetch languages for each project
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      if (!projects.length || !session?.accessToken) return;
+      
+      const newRepoLanguages: Record<string, Record<string, number>> = {};
+      
+      await Promise.all(
+        projects.map(async (project) => {
+          try {
+            const response = await fetch(project.languages_url, {
+              headers: {
+                Authorization: `Bearer ${session.accessToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+              },
+            });
+            
+            if (response.ok) {
+              const languages = await response.json();
+              newRepoLanguages[project.id] = calculateLanguagePercentages(languages);
+            }
+          } catch (error) {
+            console.error(`Error fetching languages for ${project.name}:`, error);
+          }
+        })
+      );
+      
+      setRepoLanguages(prev => ({
+        ...prev,
+        ...newRepoLanguages
+      }));
+    };
+    
+    fetchLanguages();
+  }, [projects, session?.accessToken]);
 
   const currentYear = new Date().getFullYear();
 
@@ -202,7 +257,19 @@ export default function ExportPreview({
                   <div className="text-xs text-gray-500 font-medium">
                     Member Since
                   </div>
-                  <div>2018 – Present</div>
+                  <div>
+                    {memberSinceDate 
+                      ? `${memberSinceDate.getFullYear()} – Present`
+                      : 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 font-medium">
+                    Last Coded
+                  </div>
+                  <div>
+                    {lastCodedDate ? formatLastCoded(lastCodedDate) : 'N/A'}
+                  </div>
                 </div>
               </div>
             </section>
@@ -222,24 +289,95 @@ export default function ExportPreview({
                     key={project.id}
                     className="border border-gray-100 rounded-lg p-5"
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="text-lg font-reckless font-semibold">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-lg font-reckless font-semibold">
+                            <a
+                              href={project.html_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              {project.name}
+                            </a>
+                          </h3>
+                          {project.summary && (
+                            <p className="mt-1 text-gray-700 text-sm">
+                              {project.summary}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                          <span className="flex items-center">
+                            <FiStar className="mr-1" />
+                            {project.stargazers_count?.toLocaleString() || 0}
+                          </span>
+                          <span className="flex items-center">
+                            <FiGitBranch className="mr-1" />
+                            {project.forks_count?.toLocaleString() || 0}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Repository Stats and Links */}
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-100 mt-2">
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          {project.language && (
+                            <div className="flex items-center">
+                              <span className="w-2 h-2 rounded-full bg-blue-500 mr-1.5"></span>
+                              {project.language}
+                            </div>
+                          )}
+                          {project.homepage && (
+                            <a 
+                              href={project.homepage} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center hover:text-blue-600"
+                              title="Project Website"
+                            >
+                              <FiGlobe className="mr-1" />
+                              Website
+                            </a>
+                          )}
+                        </div>
+                        
+                        <div className="flex space-x-2">
                           <a
-                            href={project.url}
+                            href={project.html_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="hover:underline text-black"
+                            className="text-xs text-gray-500 hover:text-blue-600 flex items-center"
+                            title="View on GitHub"
                           >
-                            {project.name}
+                            <FiGithub className="mr-1" />
+                            GitHub
                           </a>
-                        </h3>
-                        {project.summary && (
-                          <p className="mt-1 text-gray-700">
-                            {project.summary}
-                          </p>
-                        )}
+                        </div>
                       </div>
+                      
+                      {/* Tech Stack */}
+                      {repoLanguages[project.id] && (
+                        <div className="pt-2">
+                          <div className="text-xs text-gray-500 font-medium mb-1">Tech Stack</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {Object.entries(repoLanguages[project.id])
+                              .sort((a, b) => b[1] - a[1])
+                              .slice(0, 5)
+                              .map(([language, percentage]) => (
+                                <div 
+                                  key={language} 
+                                  className="flex items-center text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full"
+                                  title={`${language} (${percentage.toFixed(1)}%)`}
+                                >
+                                  <span className="font-medium text-gray-700">{language}</span>
+                                  <span className="ml-1 text-gray-400 text-xs">{Math.round(percentage)}%</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="flex flex-col gap-2 items-end min-w-fit">
                         {project.stars > 0 && (
                           <span className="flex items-center gap-1 text-xs text-gray-500">
