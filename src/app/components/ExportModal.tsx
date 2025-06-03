@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { FiX, FiDownload, FiRefreshCw } from "react-icons/fi";
 import { GitHubRepo } from "@/types/github";
 import {
@@ -46,25 +46,25 @@ const ExportModal: React.FC<ExportModalProps> = ({
 }) => {
   const { data: session } = useSession();
   const [exportConfig, setExportConfig] = useState<ExportConfig>({
-    // Default sections
     sections: {
       identity: true,
       stack: true,
       projects: true,
-      visuals: false, // Removed but kept in type for backward compatibility
-      keywords: false, // Removed but kept in type for backward compatibility
+      visuals: false,
+      keywords: false,
     },
-    maxProjects: 3, // Hardcoded to 3 as per requirements
-    includeReadmeBullets: true,
+    maxProjects: 3,
+    includeMetrics: true,
     includeDeveloperSummary: true,
-    includeKeywords: false, // Removed as per requirements
-    includeTechStack: false, // Removed as per requirements
+    includeKeywords: false,
+    includeTechStack: false,
     includeCommitHeatmap: false,
     includePieChart: false,
   });
 
   const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
+  const [metrics, setMetrics] = useState<any>(null);
 
   const generatedAt = useMemo(() => format(new Date(), "MMMM d, yyyy"), []);
 
@@ -81,14 +81,12 @@ const ExportModal: React.FC<ExportModalProps> = ({
   const handleToggleRepo = useCallback(
     (repoId: string) => {
       if (!repoId) return;
-
       setSelectedRepos((prev) => {
         try {
           const newSet = new Set(prev);
           if (newSet.has(repoId)) {
             newSet.delete(repoId);
           } else {
-            // Ensure we don't exceed max projects
             if (newSet.size < exportConfig.maxProjects) {
               newSet.add(repoId);
             }
@@ -103,42 +101,120 @@ const ExportModal: React.FC<ExportModalProps> = ({
     [exportConfig.maxProjects]
   );
 
-  const pdfProjects = useMemo<ProjectExport[]>(() => {
-    try {
-      if (!Array.isArray(repos) || !selectedRepos.size) return [];
+  const [pdfProjects, setPdfProjects] = useState<ProjectExport[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [developerSummary, setDeveloperSummary] = useState<string | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
-      return repos
-        .filter((repo) => repo?.id && selectedRepos.has(repo.id.toString()))
-        .map((repo) => ({
-          id: repo.id?.toString() || "",
-          name: repo.name || "Untitled Project",
-          full_name: repo.full_name || "",
-          summary: repo.description || "",
-          description: repo.description || "",
-          tags: Array.isArray(repo.topics) ? repo.topics : [],
-          bullets: [],
-          url: repo.html_url || "#",
-          html_url: repo.html_url || "#",
-          language: repo.language || "Other",
-          languages_url: repo.languages_url || "",
-          stars: repo.stargazers_count || 0,
-          stargazers_count: repo.stargazers_count || 0,
-          forks_count: repo.forks_count || 0,
-          pushed_at: repo.pushed_at || "",
-          created_at: repo.created_at || "",
-          updated_at: repo.updated_at || "",
-          hasReadme: !!repo.has_readme,
-          owner: {
-            login: repo.owner?.login || "",
-            avatar_url: repo.owner?.avatar_url || "",
-            html_url: repo.owner?.html_url || "",
-          },
-        }));
-    } catch (error) {
-      console.error("Error preparing projects for PDF:", error);
-      return [];
+  useEffect(() => {
+    if (!exportConfig.includeMetrics) {
+      setMetrics(null);
+      return;
     }
-  }, [repos, selectedRepos]);
+    if (!repos || !repos.length) {
+      setMetrics(null);
+      return;
+    }
+    const fetchMetrics = async () => {
+      try {
+        const response = await fetch("/api/ai/quick-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            repos,
+            createdAt: new Date().toISOString(),
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setMetrics(data.metrics || null);
+        } else {
+          setMetrics(null);
+        }
+      } catch {
+        setMetrics(null);
+      }
+    };
+    fetchMetrics();
+  }, [exportConfig.includeMetrics, repos]);
+
+  useEffect(() => {
+    const prepareProjects = async () => {
+      if (!Array.isArray(repos) || !selectedRepos.size) {
+        setPdfProjects([]);
+        return;
+      }
+      setIsLoadingProjects(true);
+      try {
+        const fetchRepoLanguages = async (owner: string, repoName: string) => {
+          if (!session?.accessToken) return {};
+          try {
+            const response = await fetch(
+              `https://api.github.com/repos/${owner}/${repoName}/languages`,
+              {
+                headers: {
+                  Authorization: `token ${session.accessToken}`,
+                  Accept: "application/vnd.github.v3+json",
+                },
+              }
+            );
+            if (response.ok) {
+              return await response.json();
+            }
+            return {};
+          } catch (error) {
+            console.error(
+              `Error fetching languages for ${owner}/${repoName}:`,
+              error
+            );
+            return {};
+          }
+        };
+        const projects = await Promise.all(
+          repos
+            .filter((repo) => repo?.id && selectedRepos.has(repo.id.toString()) || []).map(async (repo) => {
+              const languages = await fetchRepoLanguages(
+                repo.owner.login,
+                repo.name
+              );
+              return {
+                id: repo.id?.toString() || "",
+                name: repo.name || "Untitled Project",
+                full_name: repo.full_name || "",
+                summary: repo.description || "",
+                description: repo.description || "",
+                tags: Array.isArray(repo.topics) ? repo.topics : [],
+                bullets: [],
+                url: repo.html_url || "#",
+                html_url: repo.html_url || "#",
+                language: repo.language || "Other",
+                languages_url: repo.languages_url || "",
+                stars: repo.stargazers_count || 0,
+                stargazers_count: repo.stargazers_count || 0,
+                forks_count: repo.forks_count || 0,
+                pushed_at: repo.pushed_at || "",
+                created_at: repo.created_at || "",
+                updated_at: repo.updated_at || "",
+                hasReadme: !!repo.has_readme,
+                languages,
+                owner: {
+                  login: repo.owner?.login || "",
+                  avatar_url: repo.owner?.avatar_url || "",
+                  html_url: repo.owner?.html_url || "",
+                },
+              };
+            })
+        );
+        setPdfProjects(projects);
+      } catch (error) {
+        console.error("Error preparing projects for PDF:", error);
+        setPdfProjects([]);
+      } finally {
+        setIsLoadingProjects(false);
+      }
+    };
+    prepareProjects();
+  }, [repos, selectedRepos, session?.accessToken]);
 
   const stackSummary: StackSummary = useMemo(
     () => ({
@@ -158,14 +234,58 @@ const ExportModal: React.FC<ExportModalProps> = ({
     [topLanguages, repos]
   );
 
+  useEffect(() => {
+    const fetchDeveloperSummary = async () => {
+      if (
+        !exportConfig.includeDeveloperSummary ||
+        developerSummary !== null ||
+        isGeneratingSummary
+      )
+        return;
+      setIsGeneratingSummary(true);
+      try {
+        const response = await fetch("/api/ai/pdf-summary", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            repos: repos, // This should be the full list, not filtered!
+            createdAt: new Date().toISOString(),
+            name: userProfile.name || userProfile.login,
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setDeveloperSummary(data.summary || "");
+        } else {
+          await response.text();
+        }
+      } catch (error) {
+        setDeveloperSummary("");
+      } finally {
+        setIsGeneratingSummary(false);
+      }
+    };
+    fetchDeveloperSummary();
+  }, [
+    exportConfig.includeDeveloperSummary,
+    pdfProjects,
+    userProfile,
+    isGeneratingSummary,
+    developerSummary,
+  ]);
+
   const pdfKey = [
     exportConfig.sections.identity ? "id1" : "id0",
     exportConfig.sections.stack ? "st1" : "st0",
     exportConfig.sections.projects ? "pr1" : "pr0",
     Array.from(selectedRepos).sort().join("_"),
     exportConfig.maxProjects,
-    exportConfig.includeReadmeBullets ? "rd1" : "rd0",
-    exportConfig.includeDeveloperSummary ? "ds1" : "ds0",
+    exportConfig.includeMetrics ? "rd1" : "rd0",
+    exportConfig.includeDeveloperSummary
+      ? `ds1-${developerSummary ? "1" : "0"}`
+      : "ds0",
     exportConfig.includeKeywords ? "kw1" : "kw0",
     exportConfig.includeTechStack ? "ts1" : "ts0",
     exportConfig.includeCommitHeatmap ? "cm1" : "cm0",
@@ -173,6 +293,19 @@ const ExportModal: React.FC<ExportModalProps> = ({
   ].join("|");
 
   if (!open) return null;
+
+  const isReady =
+    pdfProjects &&
+    Array.isArray(pdfProjects) &&
+    pdfProjects.length > 0 &&
+    !isLoadingProjects;
+
+  const isDownloadReady =
+    Array.isArray(pdfProjects) &&
+    pdfProjects.length > 0 &&
+    stackSummary &&
+    (!exportConfig.includeDeveloperSummary || developerSummary !== null) &&
+    !isLoadingProjects;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm transition-all">
@@ -188,23 +321,14 @@ const ExportModal: React.FC<ExportModalProps> = ({
           flex flex-col
           min-h-[520px]
           max-h-[88vh]
-          ring-1 ring-black/5
         "
-        style={{ fontFamily: "inherit" }}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between px-8 py-6 border-b border-gray-100 bg-white/90 backdrop-blur-lg rounded-t-xl">
-          <div className="flex flex-col gap-1">
-            <div className="flex flex-row gap-3 items-center">
-              <img
-                src="/gitprooflogo.png"
-                alt="Git Proof Logo"
-                className="w-8 h-8 object-contain"
-              />
-              <span className="text-2xl font-bold tracking-tight leading-none">
-                Git Proof
-              </span>
-            </div>
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              Export Portfolio
+            </h2>
             <span className="text-xs font-medium text-gray-500 ml-11 mt-0.5">
               Export PDF
             </span>
@@ -220,7 +344,10 @@ const ExportModal: React.FC<ExportModalProps> = ({
 
         {/* Main content */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
-          <form className="space-y-10" onSubmit={(e) => e.preventDefault()}>
+          <form
+            className="space-y-10"
+            onSubmit={(e: React.FormEvent) => e.preventDefault()}
+          >
             {/* Section toggles */}
             <div>
               <h3 className="text-xl font-bold mb-4">Content Sections</h3>
@@ -316,25 +443,25 @@ const ExportModal: React.FC<ExportModalProps> = ({
               </h3>
               <div
                 className="
-    p-3
-    border
-    rounded-lg
-    bg-gray-50/70
-    border-gray-200
-    max-h-56
-    overflow-y-hidden
-    hover:overflow-y-auto
-    transition-all
-    space-y-2
-    scrollbar-thin
-    scrollbar-thumb-gray-300
-    scrollbar-track-transparent
-  "
+                  p-3
+                  border
+                  rounded-lg
+                  bg-gray-50/70
+                  border-gray-200
+                  max-h-56
+                  overflow-y-hidden
+                  hover:overflow-y-auto
+                  transition-all
+                  space-y-2
+                  scrollbar-thin
+                  scrollbar-thumb-gray-300
+                  scrollbar-track-transparent
+                "
                 style={{
                   minHeight: "56px",
                 }}
               >
-                {repos.map((repo, idx) => (
+                {(repos || []).map((repo, idx) => (
                   <label
                     key={repo.id}
                     className={`flex items-start gap-3 text-base px-2 py-2 rounded-lg transition-all ${
@@ -388,30 +515,6 @@ const ExportModal: React.FC<ExportModalProps> = ({
               <div className="flex items-start gap-3 p-4 bg-gray-50/70 rounded-xl border border-gray-200">
                 <input
                   type="checkbox"
-                  checked={exportConfig.includeReadmeBullets}
-                  onChange={(e) =>
-                    setExportConfig((cfg) => ({
-                      ...cfg,
-                      includeReadmeBullets: e.target.checked,
-                    }))
-                  }
-                  disabled={isExporting}
-                  className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">
-                    AI README Bullets
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Include key points extracted from your project READMEs using
-                    AI.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-4 bg-gray-50/70 rounded-xl border border-gray-200">
-                <input
-                  type="checkbox"
                   checked={exportConfig.includeDeveloperSummary}
                   onChange={(e) =>
                     setExportConfig((cfg) => ({
@@ -419,36 +522,64 @@ const ExportModal: React.FC<ExportModalProps> = ({
                       includeDeveloperSummary: e.target.checked,
                     }))
                   }
+                  disabled={isExporting || isGeneratingSummary}
+                  className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                />
+                <div>
+                  <div className="font-medium text-gray-900 flex items-center">
+                    AI Developer Summary
+                    {isGeneratingSummary && (
+                      <FiRefreshCw className="animate-spin ml-2 h-3 w-3 text-blue-500" />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Include an AI-generated professional summary highlighting
+                    your experience and achievements.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-4 bg-gray-50/70 rounded-xl border border-gray-200">
+                <input
+                  type="checkbox"
+                  checked={exportConfig.includeMetrics}
+                  onChange={(e) =>
+                    setExportConfig((cfg) => ({
+                      ...cfg,
+                      includeMetrics: e.target.checked,
+                    }))
+                  }
                   disabled={isExporting}
                   className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
                 />
                 <div>
-                  <div className="font-medium text-gray-900">
-                    Developer Summary
-                  </div>
+                  <div className="font-medium text-gray-900">Metrics</div>
                   <p className="text-sm text-gray-500 mt-1">
-                    Add an AI-generated summary of your development experience
-                    and expertise.
+                    Repository Count, Total Commit Count, and Longest Commit
+                    Streak.
                   </p>
                 </div>
               </div>
             </div>
-
-            {/* PDF Download Link */}
+          </form>
+          {/* PDF Download Link */}
+          {isDownloadReady && (
             <PDFDownloadLink
               key={pdfKey}
               document={
                 <PdfDocument
+                  key={`pdf-${pdfKey}`}
                   config={exportConfig}
                   userProfile={{
-                    name: userProfile.name,
+                    name: userProfile.name || userProfile.login,
                     avatarUrl: userProfile.avatar_url,
                     githubUrl: userProfile.html_url,
-                    bio: userProfile.bio ?? null,
+                    bio: userProfile.bio || null,
                   }}
                   projects={pdfProjects}
                   stackSummary={stackSummary}
                   generatedAt={generatedAt}
+                  developerSummary={developerSummary}
+                  metrics={metrics}
                 />
               }
               fileName="gitproof-export.pdf"
@@ -474,11 +605,10 @@ const ExportModal: React.FC<ExportModalProps> = ({
                 </button>
               )}
             </PDFDownloadLink>
-
-            <p className="mt-5 text-base text-gray-400 text-center">
-              Your PDF will include all selected sections and projects.
-            </p>
-          </form>
+          )}
+          <p className="mt-5 text-base text-gray-400 text-center">
+            Your PDF will include all selected sections and projects.
+          </p>
         </div>
       </div>
     </div>

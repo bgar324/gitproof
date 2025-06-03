@@ -3,7 +3,8 @@ import { getAiSummary } from "@/lib/gemini";
 import { aggregateLanguagesByYear } from "@/lib/github-metrics";
 import { GitHubRepo } from "@/types/github";
 
-interface QuickSummaryRepo extends Omit<GitHubRepo, "has_tests" | "has_ci" | "pr_count"> {
+interface QuickSummaryRepo
+  extends Omit<GitHubRepo, "has_tests" | "has_ci" | "pr_count"> {
   has_tests: boolean;
   has_ci: boolean;
   pr_count: number;
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
 
     // Type assertion for the repos array
     const typedRepos = repos as QuickSummaryRepo[];
-    
+
     // Sort repositories by stars to highlight the most significant ones
     const sortedRepos = [...typedRepos].sort(
       (a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0)
@@ -75,9 +76,7 @@ export async function POST(request: Request) {
     const reposWithTests = typedRepos.filter(
       (r) => r.code_quality?.has_tests
     ).length;
-    const reposWithCI = typedRepos.filter(
-      (r) => r.code_quality?.has_ci
-    ).length;
+    const reposWithCI = typedRepos.filter((r) => r.code_quality?.has_ci).length;
 
     // Construct a focused prompt for quick summary
     const prompt = `
@@ -110,15 +109,20 @@ export async function POST(request: Request) {
       .map(
         (repo) => `
     ${repo.name}:
-    - Description: ${repo.description || 'No description'}
+    - Description: ${repo.description || "No description"}
     - Stars: ${repo.stargazers_count || 0}
     - Forks: ${repo.forks_count || 0}
-    - Primary Language: ${repo.language || 'Not specified'}
+    - Primary Language: ${repo.language || "Not specified"}
     - Contributors: ${repo.collaboration_metrics?.total_contributors || 1}
-    - Has Tests: ${repo.code_quality?.has_tests ? 'Yes' : 'No'}
-    - Has CI: ${repo.code_quality?.has_ci ? 'Yes' : 'No'}
-    - Documentation Score: ${repo.readme_metrics?.overall_score?.toFixed(1) || 'N/A'}/100
-    - README Preview: """${repo.readme_metrics?.content?.substring(0, 1000) || 'No README content available'}"""
+    - Has Tests: ${repo.code_quality?.has_tests ? "Yes" : "No"}
+    - Has CI: ${repo.code_quality?.has_ci ? "Yes" : "No"}
+    - Documentation Score: ${
+      repo.readme_metrics?.overall_score?.toFixed(1) || "N/A"
+    }/100
+    - README Preview: """${
+      repo.readme_metrics?.content?.substring(0, 1000) ||
+      "No README content available"
+    }"""
     `
       )
       .join("\n")}
@@ -133,7 +137,20 @@ export async function POST(request: Request) {
 
     const summary = await getAiSummary(prompt, "quick-summary");
 
-    return NextResponse.json({ summary });
+    return NextResponse.json({
+      summary,
+      metrics: {
+        totalRepos,
+        multiContributorRepos,
+        totalCommits,
+        yearsOnGitHub, // <-- Add this if calculated
+        totalPRs,
+        mergedPRs,
+        reposWithTests,
+        reposWithCI,
+        // add any other metric you want to show
+      },
+    });
   } catch (error: any) {
     console.error("Error in quick summary:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,47 +1,83 @@
-import { Document, Page, View, Text, Image, StyleSheet, Font } from '@react-pdf/renderer';
-import { getLanguageColor } from './RepoCard';
+import {
+  Document,
+  Page,
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Font,
+} from "@react-pdf/renderer";
+import { getLanguageColor } from "./RepoCard";
 
 // Helper to ensure we get a string from getLanguageColor
 const getColorString = (language: string | null): string => {
   const color = getLanguageColor(language);
-  return typeof color === 'string' ? color : '#ddd';
+  return typeof color === "string" ? color : "#94a3b8";
 };
-import type { ExportConfig, ProjectExport, StackSummary } from '@/types/export';
+
+// Helper to get top languages with percentages
+const getTopLanguages = (
+  languages: Record<string, number> | undefined,
+  maxCount = 3
+) => {
+  if (!languages) return [];
+
+  const totalBytes = Object.values(languages).reduce(
+    (sum, bytes) => sum + bytes,
+    0
+  );
+  if (totalBytes === 0) return [];
+
+  return Object.entries(languages)
+    .map(([name, bytes]) => ({
+      name,
+      percent: Math.round((bytes / totalBytes) * 1000) / 10, // Keep one decimal place
+    }))
+    .sort((a, b) => b.percent - a.percent)
+    .slice(0, maxCount);
+};
+
+import type { ExportConfig, ProjectExport, StackSummary } from "@/types/export";
+
+interface PdfDocumentProps {
+  config: ExportConfig;
+  userProfile: {
+    name: string;
+    avatarUrl: string;
+    githubUrl: string;
+    bio: string | null;
+  };
+  projects: ProjectExport[];
+  stackSummary: StackSummary;
+  generatedAt: string;
+  developerSummary?: string | null;
+  metrics?: {
+    totalRepos: number;
+    totalCommits: number;
+    yearsOnGitHub: number;
+  } | null;
+}
 
 // Helper functions
 const getLighterColor = (color: string): string => {
-  // Add alpha channel for lighter color
-  return color + '40';
+  // Simple function to lighten the color for the chip background
+  return color + "33"; // Add 20% opacity
 };
 
-
-
-// Register Inter and Reckless fonts (make sure paths are correct!)
 Font.register({
-  family: 'Inter',
+  family: "Reckless",
   fonts: [
-    { src: '/fonts/Inter-Regular.ttf', fontWeight: 'normal' },
-    { src: '/fonts/Inter-Bold.ttf', fontWeight: 'bold' },
-    { src: '/fonts/Inter-Italic.ttf', fontStyle: 'italic' },
+    {
+      src: "/fonts/font_reckless/RecklessNeue-Regular.ttf",
+      fontWeight: "normal",
+    },
+    { src: "/fonts/font_reckless/RecklessNeue-Bold.ttf", fontWeight: "bold" },
+    {
+      src: "/fonts/font_reckless/RecklessNeue-Italic.ttf",
+      fontStyle: "italic",
+    },
   ],
 });
-//   fonts: [
-//     { src: '/fonts/Inter-Regular.ttf', fontWeight: 'normal' },
-//     { src: '/fonts/Inter-Bold.ttf', fontWeight: 'bold' },
-//     { src: '/fonts/Inter-Italic.ttf', fontStyle: 'italic' },
-//   ],
-// });
-
-Font.register({
-  family: 'Reckless',
-  fonts: [
-    { src: '/fonts/font_reckless/RecklessNeue-Regular.ttf', fontWeight: 'normal' },
-    { src: '/fonts/font_reckless/RecklessNeue-Bold.ttf', fontWeight: 'bold' },
-    { src: '/fonts/font_reckless/RecklessNeue-Italic.ttf', fontStyle: 'italic' },
-  ],
-});
-
-
 
 const styles = StyleSheet.create({
   page: {
@@ -215,61 +251,48 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   projectCard: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: "#f9fafb",
     borderRadius: 12,
     padding: 18,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    position: 'relative',
-    flexDirection: 'column',
-    gap: 8
+    borderColor: "#e5e7eb",
+    position: "relative",
+    flexDirection: "column",
+    gap: 8,
   },
   projectHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     marginBottom: 8,
-    gap: 8
+    gap: 8,
   },
   projectTitle: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: "bold",
+    color: "#111827",
     flex: 1,
     fontFamily: "Reckless",
   },
   projectLangChip: {
     fontSize: 10,
-    color: '#222',
+    color: "#222",
     paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 10,
-    marginLeft: 4
+    marginLeft: 4,
   },
   projectDesc: {
     fontSize: 12,
-    color: '#4b5563',
-    marginBottom: 8,
+    color: "#4b5563",
     lineHeight: 1.4,
-  },
-  projectTechStackRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginTop: 2
-  },
-  projectTechChip: {
-    fontSize: 11,
-    color: '#4b5563',
-    backgroundColor: '#f3f4f6',
     paddingVertical: 2,
     paddingHorizontal: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: "#e5e7eb",
     marginRight: 4,
-    marginBottom: 4,
   },
   developmentActivity: {
     marginTop: 24,
@@ -324,6 +347,19 @@ const styles = StyleSheet.create({
     borderTopColor: "#e5e7eb",
     paddingTop: 8,
   },
+  developerSummary: {
+    marginBottom: 24,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: "#e5e7eb",
+    marginBottom: 16,
+  },
+  summaryText: {
+    fontSize: 11,
+    lineHeight: 1.6,
+    color: "#4b5563",
+  },
   footerLogo: {
     width: 18,
     height: 18,
@@ -338,6 +374,49 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     color: "#18181b",
   },
+  // Project tech stack styles
+  projectTechStackRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 2,
+  },
+  projectTechChip: {
+    fontSize: 11,
+    color: "#4b5563",
+    backgroundColor: "#f3f4f6",
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  // Tech stack chips with percentages
+  techStackContainer: {
+    marginTop: 6,
+  },
+  techStackChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    alignItems: "center",
+  },
+  techStackChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f3f4f6",
+    borderRadius: 10,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  techStackChipName: {
+    fontSize: 9,
+    color: "#333",
+    marginRight: 4,
+  },
+  techStackChipPercent: {
+    fontSize: 9,
+    color: "#666",
+    fontWeight: "bold",
+  },
 });
 
 interface TechTagsProps {
@@ -348,12 +427,12 @@ interface TechTagsProps {
 const TechTags = ({ tags, maxTags = 5 }: TechTagsProps) => (
   <View style={styles.projectTechStackRow}>
     {tags.slice(0, maxTags).map((tag) => (
-      <Text key={tag} style={styles.projectTechChip}>{tag}</Text>
+      <Text key={tag} style={styles.projectTechChip}>
+        {tag}
+      </Text>
     ))}
     {tags.length > maxTags && (
-      <Text style={styles.projectTechChip}>
-        +{tags.length - maxTags} more
-      </Text>
+      <Text style={styles.projectTechChip}>+{tags.length - maxTags} more</Text>
     )}
   </View>
 );
@@ -364,18 +443,9 @@ export const PdfDocument = ({
   projects,
   stackSummary,
   generatedAt,
-}: {
-  config: ExportConfig;
-  userProfile: {
-    name: string;
-    avatarUrl: string;
-    githubUrl: string;
-    bio: string | null;
-  };
-  projects: ProjectExport[];
-  stackSummary: StackSummary;
-  generatedAt: string;
-}) => (
+  developerSummary,
+  metrics,
+}: PdfDocumentProps) => (
   <Document>
     <Page size="A4" style={styles.page}>
       {/* HEADER - Only show if identity section is enabled */}
@@ -411,32 +481,52 @@ export const PdfDocument = ({
                   <View key={lang.name} style={styles.stackItem}>
                     <View style={styles.stackBarRow}>
                       <Text style={styles.stackBarName}>{lang.name}</Text>
-                      <Text style={styles.stackBarPercent}>{Math.round(lang.percentage)}%</Text>
+                      <Text style={styles.stackBarPercent}>
+                        {Math.round(lang.percentage)}%
+                      </Text>
                     </View>
                     <View style={styles.stackBarBg}>
-                      <View style={{
-                        ...styles.stackBarFill,
-                        width: `${lang.percentage}%`,
-                        backgroundColor: getColorString(lang.name)
-                      }} />
+                      <View
+                        style={{
+                          ...styles.stackBarFill,
+                          width: `${lang.percentage}%`,
+                          backgroundColor: getColorString(lang.name),
+                        }}
+                      />
                     </View>
                   </View>
                 ))}
               </View>
               <View style={styles.frameworksSection}>
-                <Text style={styles.sectionTitle}>Top Technologies</Text>
-                <View style={styles.chipRow}>
-                  {stackSummary.topFrameworks.slice(0, 8).map((fw) => (
-                    <Text key={fw} style={styles.chip}>{fw}</Text>
-                  ))}
-                </View>
+                <Text style={styles.sectionTitle}>Metrics</Text>
+                {config.includeMetrics && metrics ? (
+                  <View style={{ marginBottom: 10 }}>
+                    <Text style={styles.contactText}>
+                      Repository Count: {metrics.totalRepos}
+                    </Text>
+                    <Text style={styles.contactText}>
+                      Total Commits: {metrics.totalCommits}
+                    </Text>
+                    <Text style={styles.contactText}>
+                      Years on GitHub: {metrics.yearsOnGitHub}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.chipRow}>
+                    {stackSummary.topFrameworks.slice(0, 8).map((fw) => (
+                      <Text key={fw} style={styles.chip}>
+                        {fw}
+                      </Text>
+                    ))}
+                  </View>
+                )}
               </View>
             </>
           )}
 
           {/* CONTACT INFO - Always show */}
           <View style={styles.contactSection}>
-            <Text style={styles.contactTitle}>Contact</Text>
+            <Text style={styles.sectionTitle}>Contact</Text>
             <Text style={styles.contactText}>GitHub</Text>
             <Text style={styles.contactLink}>
               {userProfile.githubUrl.replace("https://github.com/", "")}
@@ -452,34 +542,72 @@ export const PdfDocument = ({
           {config.sections.projects && projects.length > 0 && (
             <View style={styles.featuredProjectsSection}>
               <Text style={styles.sectionTitle}>
-                {projects.length === 1 ? 'Featured Project' : 'Featured Projects'}
+                {projects.length === 1
+                  ? "Featured Project"
+                  : "Featured Projects"}
               </Text>
               {projects.slice(0, 3).map((project) => (
                 <View key={project.id} style={styles.projectCard}>
                   <View style={styles.projectHeaderRow}>
                     <Text style={styles.projectTitle}>{project.name}</Text>
                     {project.language && (
-                      <Text 
-                        style={[styles.projectLangChip, { 
-                          backgroundColor: getLighterColor(getColorString(project.language))
-                        }]}
+                      <Text
+                        style={[
+                          styles.projectLangChip,
+                          {
+                            backgroundColor: getLighterColor(
+                              getColorString(project.language)
+                            ),
+                          },
+                        ]}
                       >
                         {project.language}
                       </Text>
                     )}
                   </View>
-                  
+
                   {project.description && (
-                    <Text style={styles.projectDesc}>{project.description}</Text>
+                    <Text style={styles.projectDesc}>
+                      {project.description}
+                    </Text>
                   )}
-                  
-                  {project.tags && project.tags.length > 0 && (
-                    <View style={styles.projectTechStackRow}>
-                      {project.tags.slice(0, 5).map((tag) => (
-                        <Text key={tag} style={styles.projectTechChip}>{tag}</Text>
-                      ))}
-                    </View>
-                  )}
+
+                  <View style={styles.techStackContainer}>
+                    {/* Show tech stack with percentages if available */}
+                    {project.languages &&
+                    Object.keys(project.languages).length > 0 ? (
+                      <View style={styles.techStackChips}>
+                        {getTopLanguages(project.languages, 3).map((lang) => (
+                          <View
+                            key={lang.name}
+                            style={[
+                              styles.techStackChip,
+                              {
+                                backgroundColor: getLighterColor(
+                                  getColorString(lang.name)
+                                ),
+                              },
+                            ]}
+                          >
+                            <Text style={styles.techStackChipName}>
+                              {lang.name}
+                            </Text>
+                            <Text style={styles.techStackChipPercent}>
+                              {lang.percent}%
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : project.tags && project.tags.length > 0 ? (
+                      <View style={styles.projectTechStackRow}>
+                        {project.tags.slice(0, 5).map((tag) => (
+                          <Text key={tag} style={styles.projectTechChip}>
+                            {tag}
+                          </Text>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
               ))}
             </View>
@@ -491,12 +619,21 @@ export const PdfDocument = ({
       <View style={styles.footer} fixed>
         <Image src="/gitprooflogo.png" style={styles.footerLogo} />
         <Text style={styles.footerTagline}>
-          Proof of work, <Text style={styles.footerTaglineEm}>without</Text> the guesswork.
+          Proof of work, <Text style={styles.footerTaglineEm}>without</Text> the
+          guesswork.
         </Text>
       </View>
+
+      {/* Developer Summary */}
+      {config.includeDeveloperSummary && developerSummary && (
+        <View style={styles.developerSummary}>
+          <View style={styles.sectionDivider} />
+          <Text style={styles.sectionTitle}>Developer Summary</Text>
+          <Text style={styles.summaryText}>{developerSummary}</Text>
+        </View>
+      )}
     </Page>
   </Document>
 );
-
 
 export default PdfDocument;

@@ -3,7 +3,7 @@ export type ExportSection = 'identity' | 'stack' | 'projects' | 'visuals' | 'key
 export type ExportConfig = {
   sections: Record<ExportSection, boolean>
   maxProjects: number
-  includeReadmeBullets: boolean
+  includeMetrics: boolean
   includeCommitHeatmap?: boolean  // Made optional as it's no longer used in the UI
   includePieChart?: boolean      // Made optional as it's no longer used in the UI
   includeDeveloperSummary: boolean
@@ -36,7 +36,8 @@ export type ProjectExport = {
     login: string
     avatar_url: string
     html_url: string
-  }
+  },
+  languages?: Record<string, number> // Added for language percentages
 }
 
 export type StackSummary = {
