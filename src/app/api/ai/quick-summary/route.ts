@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAiSummary } from "@/lib/gemini";
 import { aggregateLanguagesByYear } from "@/lib/github-metrics";
-import { GitHubRepo } from "@/app/types/github";
+import { GitHubRepo } from "@/types/github";
 
-interface QuickSummaryRepo extends Omit<GitHubRepo, 'has_tests' | 'has_ci' | 'pr_count'> {
+interface QuickSummaryRepo
+  extends Omit<GitHubRepo, "has_tests" | "has_ci" | "pr_count"> {
   has_tests: boolean;
   has_ci: boolean;
   pr_count: number;
@@ -19,12 +20,12 @@ export async function POST(request: Request) {
     const joinDate = new Date(createdAt);
     const currentDate = new Date();
     const yearsOnGitHub = currentDate.getFullYear() - joinDate.getFullYear();
-    
+
     // Type guard to ensure repos is an array
     if (!Array.isArray(repos)) {
-      throw new Error('Invalid repos data: expected an array');
+      throw new Error("Invalid repos data: expected an array");
     }
-    
+
     // Type assertion for the repos array
     const typedRepos = repos as QuickSummaryRepo[];
 
@@ -38,11 +39,22 @@ export async function POST(request: Request) {
     Profile Overview:
     - Years on GitHub: ${yearsOnGitHub}
     - Total Repositories: ${repos.length}
-    - Longest Commit Streak: ${Math.max(...typedRepos.map((r: QuickSummaryRepo) => r.commit_count || 0))} days
-    - PRs (Pull Requests): ${typedRepos.reduce((sum: number, r: QuickSummaryRepo) => sum + (r.pr_count || 0), 0)}
-    - Repos with Tests: ${typedRepos.filter((r: QuickSummaryRepo) => r.has_tests).length}
-    - Repos with CI: ${typedRepos.filter((r: QuickSummaryRepo) => r.has_ci).length}
-    - Stars (most popular repo): ${Math.max(...typedRepos.map((r: QuickSummaryRepo) => r.stargazers_count || 0))}
+    - Longest Commit Streak: ${Math.max(
+      ...typedRepos.map((r: QuickSummaryRepo) => r.commit_count || 0)
+    )} days
+    - PRs (Pull Requests): ${typedRepos.reduce(
+      (sum: number, r: QuickSummaryRepo) => sum + (r.pr_count || 0),
+      0
+    )}
+    - Repos with Tests: ${
+      typedRepos.filter((r: QuickSummaryRepo) => r.has_tests).length
+    }
+    - Repos with CI: ${
+      typedRepos.filter((r: QuickSummaryRepo) => r.has_ci).length
+    }
+    - Stars (most popular repo): ${Math.max(
+      ...typedRepos.map((r: QuickSummaryRepo) => r.stargazers_count || 0)
+    )}
     - Primary Languages:
     ${Object.entries(yearlyLanguages)
       .sort(([a], [b]) => Number(b) - Number(a))
@@ -63,9 +75,9 @@ export async function POST(request: Request) {
     - End with a direct assessment of current expertise level (e.g. “entry-level frontend developer,” “early-career full-stack developer with a focus on TypeScript and Next.js,” etc.)
     - Do not use generic praise. Limit to 50 words.
     `;
-    
+
     const summary = await getAiSummary(prompt, "quick-summary");
-    
+
     return NextResponse.json({ summary });
   } catch (error: any) {
     console.error("Error in quick summary:", error);

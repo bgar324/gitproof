@@ -1,195 +1,279 @@
-"use client"
-
-import { useRef } from 'react'
-import type { ExportConfig, ProjectExport, StackSummary } from '../types/export'
+import { useRef } from "react";
+import type {
+  ExportConfig,
+  ProjectExport,
+  StackSummary,
+} from "../../types/export";
+import { FiGithub, FiStar, FiGitBranch, FiCalendar } from "react-icons/fi";
+import Image from "next/image";
 
 type ExportPreviewProps = {
-  config: ExportConfig
+  config: ExportConfig;
   userProfile: {
-    name: string
-    avatarUrl: string
-    githubUrl: string
-    bio: string | null
-  }
-  stackSummary: StackSummary
-  projects: ProjectExport[]
-}
+    name: string;
+    avatarUrl: string;
+    githubUrl: string;
+    bio: string | null;
+  };
+  stackSummary: StackSummary;
+  projects: ProjectExport[];
+};
 
-export default function ExportPreview({ config, userProfile, stackSummary, projects }: ExportPreviewProps) {
-  const previewRef = useRef<HTMLDivElement>(null)
+export default function ExportPreview({
+  config,
+  userProfile,
+  stackSummary,
+  projects,
+}: ExportPreviewProps) {
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", { year: "numeric", month: "long" });
+  };
+
+  const currentYear = new Date().getFullYear();
 
   return (
-    <div 
+    <div
       ref={previewRef}
-      className="w-[21cm] min-h-[29.7cm] mx-auto p-8"
-      style={{ 
-        backgroundColor: '#ffffff',
-        color: '#1a1a1a'
+      className="w-full bg-white text-black"
+      style={{
+        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+        lineHeight: 1.6,
+        fontSize: "14px",
       }}
     >
-      {/* Identity Section */}
-      {config.sections.identity && (
-        <div className="flex items-start gap-6 mb-8">
-          <img 
+      {/* Header Row: Identity LHS, Logo RHS */}
+      <header className="border-b border-gray-200 pb-6 mb-6 flex items-start justify-between">
+        {/* Left: Avatar + Name/Bio */}
+        <div className="flex items-center">
+          <img
             src={userProfile.avatarUrl}
             alt={userProfile.name}
-            className="w-24 h-24 rounded-full"
+            className="w-10 h-10 rounded-full border-2 border-gray-200 mr-3"
+            style={{ objectFit: "cover" }}
           />
           <div>
-            <h1 className="text-3xl font-bold">{userProfile.name}</h1>
-            <a 
+            <a
               href={userProfile.githubUrl}
               target="_blank"
-              rel="noreferrer"
-              className="text-[#2563eb]"
+              rel="noopener noreferrer"
+              className="text-3xl font-reckless font-bold text-gray-900 hover:underline flex items-center"
             >
-              GitHub Profile
+              {userProfile.name}
             </a>
-            {userProfile.bio && (
-              <p className="mt-2" style={{ color: '#4b5563' }}>{userProfile.bio}</p>
-            )}
+            <p className="text-base text-gray-600 mt-0.5">
+              {userProfile.bio || "Full-stack developer"}
+            </p>
           </div>
         </div>
-      )}
+        {/* Right: GitProof Logo */}
+        <img
+          src="/gitprooflogo.png"
+          alt="GitProof Logo"
+          className="w-12 h-12"
+          style={{ objectFit: "contain" }}
+        />
+      </header>
 
-      <div className="grid grid-cols-3 gap-8">
-        {/* Stack Summary Section */}
-        {config.sections.stack && (
-          <div className="col-span-1">
-            <h2 className="text-xl font-semibold mb-4">Technical Stack</h2>
-            <div className="space-y-3">
-              {stackSummary.languages.map(lang => (
-                <div key={lang.name}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>{lang.name}</span>
-                    <span>{lang.percentage}%</span>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+        {/* Left: Stack, Contact */}
+        <div className="md:col-span-1 space-y-8">
+          {config.sections.stack && (
+            <section>
+              <h2 className="text-lg font-reckless font-semibold mb-3 tracking-tight">
+                Technical Stack
+              </h2>
+              <div className="space-y-3">
+                {stackSummary.languages.map((lang) => (
+                  <div key={lang.name}>
+                    <div className="flex justify-between text-sm font-medium">
+                      <span>{lang.name}</span>
+                      <span className="text-gray-500">
+                        {Math.round(lang.percentage)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${lang.percentage}%`,
+                          background: "#222",
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full" style={{ backgroundColor: '#f3f4f6' }}>
-                    <div 
-                      className="h-full rounded-full"
-                      style={{ 
-                        backgroundColor: '#2563eb',
-                        width: `${lang.percentage}%`
-                      }}
-                    />
+                ))}
+              </div>
+              {config.includeTechStack &&
+                stackSummary.topFrameworks.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="font-reckless font-medium mb-2 text-gray-800">
+                      Frameworks & Tools
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {stackSummary.topFrameworks.map((framework) => (
+                        <span
+                          key={framework}
+                          className="px-3 py-1 bg-gray-200 text-gray-800 text-xs rounded-full font-medium"
+                        >
+                          {framework}
+                        </span>
+                      ))}
+                    </div>
                   </div>
+                )}
+            </section>
+          )}
+
+          {config.sections.identity && (
+            <section>
+              <h2 className="text-lg font-reckless font-semibold mb-3 tracking-tight">
+                Contact
+              </h2>
+              <div className="space-y-2">
+                <div>
+                  <div className="text-xs text-gray-500 font-medium">
+                    GitHub
+                  </div>
+                  <a
+                    href={userProfile.githubUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-black font-medium underline"
+                  >
+                    {userProfile.githubUrl.replace("https://github.com/", "")}
+                  </a>
                 </div>
-              ))}
-            </div>
-
-            {stackSummary.topFrameworks.length > 0 && (
-              <div className="mt-6">
-                <h3 className="font-medium mb-2">Frameworks & Tools</h3>
-                <div className="flex flex-wrap gap-2">
-                  {stackSummary.topFrameworks.map(framework => (
-                    <span 
-                      key={framework}
-                      className="px-2 py-1 rounded-full text-sm"
-                      style={{ backgroundColor: '#f3f4f6' }}
-                    >
-                      {framework}
-                    </span>
-                  ))}
+                <div>
+                  <div className="text-xs text-gray-500 font-medium">
+                    Member Since
+                  </div>
+                  <div>2018 – Present</div>
                 </div>
               </div>
-            )}
-          </div>
-        )}
+            </section>
+          )}
+        </div>
 
-        {/* Projects Section */}
-        {config.sections.projects && (
-          <div className="col-span-2">
-            <h2 className="text-xl font-semibold mb-4">Notable Projects</h2>
-            <div className="space-y-6">
-              {projects.slice(0, config.maxProjects).map(project => (
-                <div key={project.name} className="border-b pb-4 last:border-0">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-medium">
-                        <a 
-                          href={project.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: '#2563eb' }}
-                        >
-                          {project.name}
-                        </a>
-                      </h3>
-                      <p className="mt-1" style={{ color: '#4b5563' }}>{project.summary}</p>
+        {/* Right: Projects, Visuals */}
+        <div className="md:col-span-2 space-y-10">
+          {config.sections.projects && projects.length > 0 && (
+            <section>
+              <h2 className="text-2xl font-reckless font-extrabold mb-5 tracking-tight">
+                Featured Projects
+              </h2>
+              <div className="space-y-5">
+                {projects.map((project) => (
+                  <article
+                    key={project.id}
+                    className="border border-gray-100 rounded-lg p-5"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-reckless font-semibold">
+                          <a
+                            href={project.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline text-black"
+                          >
+                            {project.name}
+                          </a>
+                        </h3>
+                        {project.summary && (
+                          <p className="mt-1 text-gray-700">
+                            {project.summary}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2 items-end min-w-fit">
+                        {project.stars > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-gray-500">
+                            <FiStar className="inline" /> {project.stars}
+                          </span>
+                        )}
+                        {project.language && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-900">
+                            {project.language}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      {project.language && (
-                        <span className="px-2 py-1 rounded-full" style={{ backgroundColor: '#f3f4f6' }}>
-                          {project.language}
-                        </span>
+                    {project.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {project.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2 py-0.5 bg-gray-200 text-gray-800 text-xs rounded-full"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {config.includeReadmeBullets &&
+                      project.bullets.length > 0 && (
+                        <ul className="mt-3 space-y-1 text-sm text-gray-600 list-disc list-inside">
+                          {project.bullets.map((bullet, i) => (
+                            <li key={i}>{bullet}</li>
+                          ))}
+                        </ul>
                       )}
-                      <span>⭐ {project.stars}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {config.sections.visuals && (
+            <section>
+              <h2 className="text-2xl font-reckless font-extrabold mb-5 tracking-tight">
+                Development Activity
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {config.includeCommitHeatmap && (
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                    <h3 className="font-reckless mb-3 text-gray-700">
+                      Contribution Heatmap
+                    </h3>
+                    <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
+                      [Commit Heatmap Placeholder]
                     </div>
                   </div>
-
-                  {config.includeReadmeBullets && project.bullets.length > 0 && (
-                    <ul className="mt-3 space-y-1 text-sm list-disc list-inside" style={{ color: '#4b5563' }}>
-                      {project.bullets.map((bullet, i) => (
-                        <li key={i}>{bullet}</li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {project.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {project.tags.map(tag => (
-                        <span 
-                          key={tag}
-                          className="px-2 py-1 rounded-full text-sm"
-                          style={{ backgroundColor: '#f3f4f6' }}
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                )}
+                {config.includePieChart && (
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                    <h3 className="font-reckless mb-3 text-gray-700">
+                      Language Distribution
+                    </h3>
+                    <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
+                      [Pie Chart Placeholder]
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
       </div>
 
-      {/* Visuals Section */}
-      {config.sections.visuals && (
-        <div className="mt-8 grid grid-cols-2 gap-8">
-          {config.includePieChart && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Language Distribution</h2>
-              {/* We'll implement the pie chart using a library like Chart.js */}
-              <div className="h-64 rounded flex items-center justify-center" style={{ backgroundColor: '#f9fafb' }}>
-                [Language Pie Chart]
-              </div>
-            </div>
-          )}
-
-          {config.includeCommitHeatmap && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Contribution Activity</h2>
-              {/* We'll implement the heatmap using a library like react-calendar-heatmap */}
-              <div className="h-64 rounded flex items-center justify-center" style={{ backgroundColor: '#f9fafb' }}>
-                [Commit Heatmap]
-              </div>
-            </div>
-          )}
+      {/* Footer: logo left, tagline right */}
+      <footer className="mt-14 pt-8 pb-3 border-t border-gray-200 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/gitprooflogo.png"
+            alt="GitProof Logo"
+            width={32}
+            height={32}
+            className="w-8 h-8"
+          />
         </div>
-      )}
-
-      {/* Keywords Section */}
-      {config.sections.keywords && (
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">Technology Keywords</h2>
-          {/* We'll implement the word cloud using a library like react-wordcloud */}
-          <div className="h-48 bg-gray-50 rounded flex items-center justify-center">
-            [Keyword Cloud]
-          </div>
-        </div>
-      )}
+        <span className="font-reckless text-base text-black tracking-tight">
+          Proof of work, <span className="italic">without</span> the guesswork.
+        </span>
+      </footer>
     </div>
-  )
+  );
 }

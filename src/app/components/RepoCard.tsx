@@ -1,17 +1,17 @@
 // RepoCard.tsx
 "use client";
 
-function decodeBase64Utf8(base64:any) {
+function decodeBase64Utf8(base64: any) {
   const binary = atob(base64);
-  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
-  return new TextDecoder('utf-8').decode(bytes);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder("utf-8").decode(bytes);
 }
 
 import { useEffect, useState, useCallback } from "react";
 import ReadmePreview from "./ReadmePreview";
 import ReadmeStatus from "./ReadmeStatus";
 import { marked } from "marked";
-import { GitHubRepo } from "../types/github";
+import { GitHubRepo } from "../../types/github";
 import Image from "next/image";
 import { FiAlertTriangle } from "react-icons/fi";
 

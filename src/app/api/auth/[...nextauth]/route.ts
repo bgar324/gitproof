@@ -23,7 +23,7 @@ export const authOptions: AuthOptions = {
     async session({ session, token }) {
       session.accessToken = token.accessToken as string | undefined
       if (session.user) {
-        // Get user data including email
+        // Get user data including email and profile URL
         const userResponse = await fetch('https://api.github.com/user', {
           headers: { 
             Authorization: `Bearer ${token.accessToken}`,
@@ -49,7 +49,12 @@ export const authOptions: AuthOptions = {
           session.user.email = userData.email
         }
         
-        session.user.createdAt = userData.created_at
+        // Add GitHub profile URL to the user session
+        if (userData.html_url) {
+          session.user.html_url = userData.html_url
+        }
+        
+        session.user.created_at = userData.created_at
       }
       return session
     },

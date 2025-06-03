@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { GitHubRepo } from "../types/github";
+import { GitHubRepo } from "../../types/github";
 
 interface QuickProfileSummaryProps {
   repos: GitHubRepo[];
-  createdAt: string;
+  created_at: string;
   languages: Record<string, number>;
   totalStars: number;
   totalForks: number;
@@ -13,7 +13,7 @@ interface QuickProfileSummaryProps {
 
 export default function QuickProfileSummary({
   repos,
-  createdAt,
+  created_at,
   languages,
   totalStars,
   totalForks,
@@ -41,7 +41,7 @@ export default function QuickProfileSummary({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ repos, createdAt }),
+          body: JSON.stringify({ repos, created_at }),
         });
 
         if (response.ok) {
@@ -57,7 +57,7 @@ export default function QuickProfileSummary({
     };
 
     generateSummary();
-  }, [repos, createdAt]);
+  }, [repos, created_at]);
 
   if (loading) {
     return (

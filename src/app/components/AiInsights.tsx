@@ -46,7 +46,7 @@ type AiInsightsProps = {
   repos: any[];
   languages?: Record<string, number>;
   commitActivity?: Record<string, number>;
-  createdAt?: string;
+  created_at?: string;
 };
 
 type Insights = {
@@ -58,7 +58,7 @@ export default function AiInsights({
   repos,
   languages,
   commitActivity,
-  createdAt,
+  created_at,
 }: AiInsightsProps) {
   const [loading, setLoading] = useState(false);
   const [insights, setInsights] = useState<Insights>({
@@ -106,7 +106,7 @@ export default function AiInsights({
         repos,
         languages,
         commitActivity,
-        createdAt: createdAt || new Date().toISOString(),
+        created_at: created_at || new Date().toISOString(),
       };
 
       const [devResponse, recruiterResponse] = await Promise.all([

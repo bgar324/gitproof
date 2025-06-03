@@ -6,9 +6,13 @@ export type ExportConfig = {
   includeReadmeBullets: boolean
   includeCommitHeatmap: boolean
   includePieChart: boolean
+  includeDeveloperSummary: boolean
+  includeKeywords: boolean
+  includeTechStack: boolean
 }
 
 export type ProjectExport = {
+  id: string | number
   name: string
   summary: string
   tags: string[]
@@ -16,6 +20,7 @@ export type ProjectExport = {
   url: string
   language: string | null
   stars: number
+  hasReadme?: boolean
 }
 
 export type StackSummary = {

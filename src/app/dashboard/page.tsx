@@ -8,8 +8,8 @@ import AiInsights from "../components/AiInsights";
 import QuickProfileSummary from "../components/QuickProfileSummary";
 import Sidebar from "../components/Sidebar";
 import ExportModal from "../components/ExportModal";
-import { GitHubRepo } from "../types/github";
-import { ExportConfig as ExportConfigType } from "../types/export";
+import { GitHubRepo } from "../../types/github";
+import { ExportConfig as ExportConfigType } from "../../types/export";
 
 type GitHubStats = {
   repos: GitHubRepo[];
@@ -225,7 +225,7 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
-        {session?.user?.createdAt && (
+        {session?.user?.created_at && (
           <div className="space-y-6">
             <div id="summary" className="notion-card p-6">
               <h3 className="text-3xl font-semibold font-reckless mb-4 flex items-center gap-2">
@@ -233,7 +233,7 @@ export default function DashboardPage() {
               </h3>
               <QuickProfileSummary
                 repos={stats.repos}
-                createdAt={session.user.createdAt}
+                created_at={session.user.created_at}
                 languages={stats.languages}
                 totalStars={stats.totalStars}
                 totalForks={stats.totalForks}
@@ -242,7 +242,7 @@ export default function DashboardPage() {
             <div id="ai-insights" className="notion-card p-6 px-8">
               <AiInsights
                 repos={stats.repos}
-                createdAt={session.user.createdAt}
+                created_at={session.user.created_at}
               />
             </div>
           </div>
@@ -268,7 +268,9 @@ export default function DashboardPage() {
         userProfile={{
           name: session?.user?.name || "",
           avatarUrl: session?.user?.image || "",
-          githubUrl: `https://github.com/${session?.user?.name}`,
+          githubUrl:
+            session?.user?.html_url ||
+            `https://github.com/${session?.user?.name}`,
           bio: null,
         }}
         repos={stats.repos}
