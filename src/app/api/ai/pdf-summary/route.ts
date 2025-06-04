@@ -1,52 +1,64 @@
-import { NextResponse } from "next/server";
-import { getAiSummary } from "@/lib/gemini";
-import { aggregateLanguagesByYear } from "@/lib/github-metrics";
-import { GitHubRepo } from "@/types/github";
+import { NextResponse } from "next/server"
+import { getAiSummary } from "@/lib/gemini"
+import { getDetailedRepoMetrics, aggregateLanguagesByYear } from "@/lib/github-metrics"
+import { Octokit } from "@octokit/rest"
+import { getServerSession } from "next-auth"
+import { authOptions } from "../../auth/[...nextauth]/route"
+import { GitHubRepo } from "@/types/github"
 
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions)
+  if (!session?.accessToken) {
+    return new Response("Unauthorized", { status: 401 })
+  }
+
   try {
-    const { repos, createdAt, name } = await request.json();
+    const { repos, createdAt, name } = await request.json()
 
     if (!Array.isArray(repos)) {
       return new NextResponse(
         JSON.stringify({ error: 'Invalid repos data: expected an array' }),
         { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      )
     }
 
-    // Full metrics, all repos, just like developer-insight
-    const joinDate = new Date(createdAt);
-    const currentDate = new Date();
-    const yearsOnGitHub = currentDate.getFullYear() - joinDate.getFullYear();
+    const octokit = new Octokit({ auth: session.accessToken })
+    const repoMetricsPromises = repos.map((repo: any) =>
+      getDetailedRepoMetrics(octokit, repo.owner.login, repo.name)
+    )
+    const repoDetails = await Promise.all(repoMetricsPromises)
 
-    const typedRepos = repos;
-    const sortedRepos = [...typedRepos].sort(
-      (a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0)
-    );
-    const yearlyLanguages = aggregateLanguagesByYear(repos);
+    // Calculate years on GitHub
+    const joinDate = new Date(createdAt)
+    const currentDate = new Date()
+    const yearsOnGitHub = currentDate.getFullYear() - joinDate.getFullYear()
 
-    const totalRepos = typedRepos.length;
-    const multiContributorRepos = typedRepos.filter(
-      (r) => (r.collaboration_metrics?.total_contributors || 0) > 1
-    ).length;
-    const totalCommits = typedRepos.reduce(
-      (sum, r) => sum + (r.commit_metrics?.total_commits || 0),
-      0
-    );
-    const totalPRs = typedRepos.reduce(
-      (sum, r) => sum + (r.collaboration_metrics?.total_prs || 0),
-      0
-    );
-    const mergedPRs = typedRepos.reduce(
-      (sum, r) => sum + (r.collaboration_metrics?.merged_prs || 0),
-      0
-    );
-    const reposWithTests = typedRepos.filter(
-      (r) => r.code_quality?.has_tests
-    ).length;
-    const reposWithCI = typedRepos.filter((r) => r.code_quality?.has_ci).length;
+    // Sort repositories by stars
+    const sortedRepos = [...repoDetails].sort(
+      (a, b) => b.stars - a.stars
+    )
 
-    // Glowing recruiter summary (pedestal mode)
+    const yearlyLanguages = aggregateLanguagesByYear(repoDetails)
+
+    const totalRepos = repoDetails.length
+    const multiContributorRepos = repoDetails.filter(
+      (r) => r.collaboration_metrics.total_contributors > 1
+    ).length
+    const totalCommits = repoDetails.reduce(
+      (sum, r) => sum + r.commit_metrics.total_commits,
+      0
+    )
+    const totalPRs = repoDetails.reduce(
+      (sum, r) => sum + r.collaboration_metrics.total_prs,
+      0
+    )
+    const mergedPRs = repoDetails.reduce(
+      (sum, r) => sum + r.collaboration_metrics.merged_prs,
+      0
+    )
+    const reposWithTests = repoDetails.filter((r) => r.code_quality.has_tests).length
+    const reposWithCI = repoDetails.filter((r) => r.code_quality.has_ci).length
+
     const prompt = `
 Write a recruiter-facing, glowing 2-3 sentence summary for this developer, focusing only on technical strengths, breadth of work, and notable skills or accomplishments. Never mention negatives or lack. Frame all metrics and highlights in a maximally positive light.
 
@@ -74,23 +86,21 @@ ${sortedRepos
   .slice(0, 3)
   .map(
     (repo) => `
-${repo.name} (${repo.language || "Unknown"}): ${
-      repo.description || "No description"
-    }
-- ⭐ ${repo.stargazers_count} | Forks: ${repo.forks_count}
-- Contributors: ${repo.collaboration_metrics?.total_contributors || 1}
-- Automated Tests: ${repo.code_quality?.has_tests ? "Yes" : "No"}
-- CI: ${repo.code_quality?.has_ci ? "Yes" : "No"}`
+${repo.name} (${repo.language || "Unknown"}): ${repo.description || "No description"}
+- ⭐ ${repo.stars} | Forks: ${repo.forks}
+- Contributors: ${repo.collaboration_metrics.total_contributors}
+- Automated Tests: ${repo.code_quality.has_tests ? "Yes" : "No"}
+- CI: ${repo.code_quality.has_ci ? "Yes" : "No"}`
   )
   .join("\n")}
 
 Write exactly 2-3 concise, positive, professional sentences, as if you were a recruiter highlighting only this developer's strengths.
-`;
+`
 
-    const summary = await getAiSummary(prompt, "pdf-summary");
+    const summary = await getAiSummary(prompt, "pdf-summary")
 
-    return NextResponse.json({ summary });
+    return NextResponse.json({ summary })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

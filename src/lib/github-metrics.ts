@@ -349,44 +349,107 @@ async function analyzeCommits(
   owner: string,
   repo: string
 ) {
-  const { data: commits } = await octokit.repos.listCommits({
-    owner,
-    repo,
-    per_page: 100, // Get last 100 commits
-  });
+  // Get all commits across all branches
+  const allCommits: CommitResponse[] = [];
+  let page = 1;
+  let hasMore = true;
+  
+  while (hasMore) {
+    const { data: commits } = await octokit.repos.listCommits({
+      owner,
+      repo,
+      per_page: 100, // Max allowed by GitHub API
+      page,
+    });
+
+    if (commits.length === 0) {
+      hasMore = false;
+    } else {
+      allCommits.push(...commits);
+      // If we got less than 100 commits, we've reached the end
+      if (commits.length < 100) {
+        hasMore = false;
+      }
+      page++;
+    }
+  }
+
+
+  // Sort commits by date (oldest first)
+  const sortedCommits = [...allCommits].sort((a, b) => 
+    new Date(a.commit.author?.date || 0).getTime() - new Date(b.commit.author?.date || 0).getTime()
+  );
 
   // Calculate commit frequency by month
   const frequency: { [key: string]: number } = {};
-  commits.forEach((commit: CommitResponse) => {
-    const date = new Date(commit.commit.author?.date || '');
-    const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+  const commitDates: Date[] = [];
+  
+  sortedCommits.forEach((commit: CommitResponse) => {
+    if (!commit.commit.author?.date) return;
+    
+    const date = new Date(commit.commit.author.date);
+    commitDates.push(date);
+    
+    // Group by year-month for frequency
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     frequency[key] = (frequency[key] || 0) + 1;
   });
 
   // Calculate longest streak
-  let currentStreak = 0;
   let longestStreak = 0;
-  let lastDate: Date | null = null;
-
-  commits.forEach((commit: CommitResponse) => {
-    const date = new Date(commit.commit.author?.date || '');
-    if (lastDate) {
-      const dayDiff = Math.floor((lastDate.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-      if (dayDiff <= 1) {
+  let currentStreak = 1;
+  
+  if (commitDates.length > 0) {
+    // Sort unique dates
+    const uniqueDates = Array.from(new Set(
+      commitDates.map(d => d.toISOString().split('T')[0])
+    )).sort();
+    
+    for (let i = 1; i < uniqueDates.length; i++) {
+      const currentDate = new Date(uniqueDates[i]);
+      const previousDate = new Date(uniqueDates[i - 1]);
+      
+      // Calculate difference in days
+      const diffTime = currentDate.getTime() - previousDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        // Consecutive day
         currentStreak++;
         longestStreak = Math.max(longestStreak, currentStreak);
-      } else {
-        currentStreak = 0;
+      } else if (diffDays > 1) {
+        // Reset streak if gap is more than 1 day
+        currentStreak = 1;
       }
+      // If same day, don't increment streak
     }
-    lastDate = date;
-  });
+    
+    // If we only have one commit day, the streak is 1
+    if (uniqueDates.length === 1) {
+      longestStreak = 1;
+    }
+  }
 
+  // Get commit stats from the repository
+  const { data: repoStats } = await octokit.repos.getParticipationStats({
+    owner,
+    repo,
+  });
+  
+  // Calculate total commits from all time (includes all branches)
+  const totalCommits = allCommits.length;
+  
   return {
-    total_commits: commits.length,
-    last_commit_date: commits[0]?.commit.author?.date || '',
+    total_commits: totalCommits,
+    last_commit_date: sortedCommits[sortedCommits.length - 1]?.commit.author?.date || '',
+    first_commit_date: sortedCommits[0]?.commit.author?.date || '',
     longest_streak_days: longestStreak,
     commit_frequency: frequency,
+    commit_stats: {
+      weekly: repoStats.all || [],
+      total_weekly_commits: (repoStats.all || []).reduce((sum, count) => sum + count, 0),
+      unique_days_with_commits: new Set(commitDates.map(d => d.toISOString().split('T')[0])).size,
+    },
   };
 }
 

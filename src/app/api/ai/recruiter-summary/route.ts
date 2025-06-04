@@ -1,61 +1,59 @@
-import { getServerSession } from "next-auth";
-import { NextResponse } from "next/server";
-import { authOptions } from "../../auth/[...nextauth]/route";
-import { getAiSummary } from "@/lib/gemini";
-import { Octokit } from "@octokit/rest";
+import { getServerSession } from "next-auth"
+import { NextResponse } from "next/server"
+import { authOptions } from "../../auth/[...nextauth]/route"
+import { getAiSummary } from "@/lib/gemini"
+import { Octokit } from "@octokit/rest"
 import {
   getDetailedRepoMetrics,
   aggregateLanguagesByYear,
-} from "@/lib/github-metrics";
+} from "@/lib/github-metrics"
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions)
 
   if (!session?.accessToken) {
-    return new Response("Unauthorized", { status: 401 });
+    return new Response("Unauthorized", { status: 401 })
   }
 
   try {
-    const { repos, createdAt } = await request.json();
-    const octokit = new Octokit({ auth: session.accessToken });
+    const { repos, createdAt } = await request.json()
+    const octokit = new Octokit({ auth: session.accessToken })
 
     // Calculate years on GitHub
-    const joinDate = new Date(createdAt);
-    const currentDate = new Date();
-    const yearsOnGitHub = currentDate.getFullYear() - joinDate.getFullYear();
+    const joinDate = new Date(createdAt)
+    const currentDate = new Date()
+    const yearsOnGitHub = currentDate.getFullYear() - joinDate.getFullYear()
 
     // Get detailed metrics for each repository
     const repoMetricsPromises = repos.map((repo: any) =>
       getDetailedRepoMetrics(octokit, repo.owner.login, repo.name)
-    );
-
-    const repoDetails = await Promise.all(repoMetricsPromises);
-    const yearlyLanguages = aggregateLanguagesByYear(repoDetails);
+    )
+    const repoDetails = await Promise.all(repoMetricsPromises)
+    const yearlyLanguages = aggregateLanguagesByYear(repoDetails)
 
     // Calculate aggregate metrics
-    const totalRepos = repoDetails.length;
+    const totalRepos = repoDetails.length
     const multiContributorRepos = repoDetails.filter(
       (r) => r.collaboration_metrics.total_contributors > 1
-    ).length;
+    ).length
     const totalCommits = repoDetails.reduce(
       (sum, r) => sum + r.commit_metrics.total_commits,
       0
-    );
+    )
     const longestStreak = Math.max(
       ...repoDetails.map((r) => r.commit_metrics.longest_streak_days)
-    );
+    )
     const totalPRs = repoDetails.reduce(
       (sum, r) => sum + r.collaboration_metrics.total_prs,
       0
-    );
+    )
     const mergedPRs = repoDetails.reduce(
       (sum, r) => sum + r.collaboration_metrics.merged_prs,
       0
-    );
-    const reposWithTests = repoDetails.filter(
-      (r) => r.code_quality.has_tests
-    ).length;
-    const reposWithCI = repoDetails.filter((r) => r.code_quality.has_ci).length;
+    )
+    const reposWithTests = repoDetails.filter((r) => r.code_quality.has_tests)
+      .length
+    const reposWithCI = repoDetails.filter((r) => r.code_quality.has_ci).length
 
     // Find most significant repositories based on metrics
     const significantRepos = repoDetails
@@ -68,20 +66,18 @@ export async function POST(request: Request) {
           repo.collaboration_metrics.total_contributors * 5 +
           (repo.code_quality.has_tests ? 10 : 0) +
           (repo.code_quality.has_ci ? 10 : 0) +
-          (repo.readme_metrics.word_count > 300 ? 5 : 0),
+          (repo.readme_metrics?.word_count > 300 ? 5 : 0),
       }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, 3);
+      .slice(0, 3)
 
     // Calculate documentation quality metrics
-    const reposWithReadme = repoDetails.filter(
-      (r) => r.readme_metrics !== null
-    ).length;
+    const reposWithReadme = repoDetails.filter((r) => r.readme_metrics).length
     const avgReadmeScore =
       repoDetails.reduce(
         (sum, r) => sum + (r.readme_metrics?.overall_score || 0),
         0
-      ) / repoDetails.length;
+      ) / totalRepos
 
     const readmeQualityBreakdown = {
       installation: repoDetails.filter(
@@ -99,9 +95,9 @@ export async function POST(request: Request) {
       examples: repoDetails.filter(
         (r) => r.readme_metrics?.quality_signals.has_examples
       ).length,
-    };
+    }
 
-    // Construct the prompt for AI analysis
+    // Construct the prompt for AI analysis (unchanged)
     const prompt = `
       Generate a professional, recruiter-facing profile summary based on these verified GitHub metrics. Use third-person, neutral language. Focus on providing a clear snapshot of technical skills, progression, and project highlights.
 
@@ -140,7 +136,7 @@ export async function POST(request: Request) {
         ]
           .filter(Boolean)
           .join(", ")}
-        - README Preview: """${repo.readme_metrics?.content?.substring(0, 1000) || 'No README content available'}"""
+        - README Preview: """${repo.readme_metrics?.content || "No README content available"}"""
       `
         )
         .join("")}
@@ -161,8 +157,7 @@ export async function POST(request: Request) {
         .map(
           ([year, langs]) =>
             `${year}: ${Object.entries(langs)
-              .sort(([, a], [, b]) => b - a)
-              .map(([lang]) => lang)
+              .map(([lang, count]) => `${lang} (${count})`)
               .join(", ")}`
         )
         .join("\n")}
@@ -177,20 +172,20 @@ export async function POST(request: Request) {
       Be specific about documentation practices - if the score is low (below 60), note it as an area for improvement. If high (above 80), highlight it as a strength.
 
       Output in a neutral, third-person style suitable for a professional profile. Focus on concrete metrics and observable patterns.
-    `;
+    `
 
     const analysis = await getAiSummary(
       prompt,
       `recruiter-${session.user?.name || "anonymous"}`
-    );
+    )
     return new NextResponse(JSON.stringify({ analysis }), {
       headers: { "Content-Type": "application/json" },
-    });
+    })
   } catch (error: any) {
-    console.error("Error in recruiter analysis:", error);
+    console.error("Error in recruiter analysis:", error)
     return new NextResponse(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
-    });
+    })
   }
 }
