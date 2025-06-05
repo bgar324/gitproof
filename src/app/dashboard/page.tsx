@@ -9,7 +9,6 @@ import QuickProfileSummary from "../components/QuickProfileSummary";
 import Sidebar from "../components/Sidebar";
 import ExportModal from "../components/ExportModal";
 import { GitHubRepo } from "../../types/github";
-import { ExportConfig as ExportConfigType } from "../../types/export";
 
 type GitHubStats = {
   repos: GitHubRepo[];
@@ -272,7 +271,7 @@ export default function DashboardPage() {
             session?.user?.html_url ||
             `https://github.com/${session?.user?.name}`,
           bio: null,
-          login: session?.user?.name || ""
+          login: session?.user?.name || "",
         }}
         repos={stats.repos}
         topLanguages={stats.topLanguages}

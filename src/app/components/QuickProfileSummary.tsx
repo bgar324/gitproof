@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { GitHubRepo } from "../../types/github";
+import { GitHubRepo } from "@/types/github";
+import { Session } from "next-auth";
 
 interface QuickProfileSummaryProps {
   repos: GitHubRepo[];
@@ -9,6 +10,7 @@ interface QuickProfileSummaryProps {
   languages: Record<string, number>;
   totalStars: number;
   totalForks: number;
+  // session: Session | null;
 }
 
 export default function QuickProfileSummary({
@@ -17,6 +19,7 @@ export default function QuickProfileSummary({
   languages,
   totalStars,
   totalForks,
+  // session,
 }: QuickProfileSummaryProps) {
   const [summary, setSummary] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -69,28 +72,66 @@ export default function QuickProfileSummary({
     );
   }
 
+  // Calculate years on GitHub
+  const yearsOnGitHub = created_at
+    ? new Date().getFullYear() - new Date(created_at).getFullYear()
+    : 0;
+
+  // Calculate other metrics
+  const totalCommits = repos.reduce(
+    (sum, repo) => sum + (repo.commit_count || 0),
+    0
+  );
+
+  // Calculate average repo size in KB
+  const totalSizeKB = repos.reduce((sum, repo) => sum + (repo.size || 0), 0);
+  const avgRepoSizeKB =
+    repos.length > 0 ? Math.round(totalSizeKB / repos.length) : 0;
+
+  // Count active repos (updated in last 6 months)
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const activeRepos = repos.filter(
+    (repo) => repo.pushed_at && new Date(repo.pushed_at) > sixMonthsAgo
+  ).length;
+
+  // Stats Grid
+  const stats = [
+    { label: "Total Repositories", value: repos.length },
+    { label: "Total Stars", value: totalStars },
+    { label: "Total Forks", value: totalForks },
+    { label: "Total Commits", value: totalCommits },
+    { label: "Years on GitHub", value: yearsOnGitHub },
+    { label: "Active Repos (6m)", value: activeRepos },
+    { label: "Avg Repo Size", value: `${avgRepoSizeKB} KB` },
+    { label: "Languages Used", value: Object.keys(languages).length },
+  ];
+
+  // Responsive grid columns
+  const gridCols = "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
+  const statCardClasses =
+    "notion-card p-4 sm:p-6 flex flex-col justify-between";
+  const statValueClasses = "text-xl sm:text-2xl font-semibold truncate";
+  const statLabelClasses =
+    "text-xs sm:text-sm font-medium text-gray-500 truncate";
+
+  // Top languages
+  const topLanguages = Object.entries(languages)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5);
+
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="notion-card p-6">
-          <h4 className="text-sm font-medium text-gray-500 mb-2">
-            Total Repositories
-          </h4>
-          <p className="text-2xl font-semibold">{repos.length}</p>
-        </div>
-        <div className="notion-card p-6">
-          <h4 className="text-sm font-medium text-gray-500 mb-2">
-            Total Stars
-          </h4>
-          <p className="text-2xl font-semibold">{totalStars}</p>
-        </div>
-        <div className="notion-card p-6">
-          <h4 className="text-sm font-medium text-gray-500 mb-2">
-            Total Forks
-          </h4>
-          <p className="text-2xl font-semibold">{totalForks}</p>
-        </div>
+      <div className={`grid ${gridCols} gap-6`}>
+        {stats.map((stat, index) => (
+          <div key={index} className={statCardClasses}>
+            <h4 className={statLabelClasses}>{stat.label}</h4>
+            <p className={statValueClasses}>
+              {stat.value}
+            </p>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -160,54 +201,54 @@ export default function QuickProfileSummary({
         ) : (
           <div className="flex justify-between items-center">
             <div></div> {/* Empty div to balance the flex layout */}
-          <button
-            onClick={async () => {
-              setLoading(true);
-              try {
-                const response = await fetch("/api/ai/quick-summary", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ repos, created_at }),
-                });
-                if (response.ok) {
-                  const data = await response.json();
-                  setSummary(data.summary);
-                  localStorage.setItem("quickProfileSummary", data.summary);
-                }
-              } catch (e) {}
-              setLoading(false);
-            }}
-            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-black/90 flex items-center gap-2 text-sm font-medium transition-colors duration-200 hover:shadow-sm font-reckless"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <svg
-                  className="animate-spin h-4 w-4 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                <span>Generating...</span>
-              </>
-            ) : (
-              "Generate Insights"
-            )}
-          </button>
+            <button
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const response = await fetch("/api/ai/quick-summary", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ repos, created_at }),
+                  });
+                  if (response.ok) {
+                    const data = await response.json();
+                    setSummary(data.summary);
+                    localStorage.setItem("quickProfileSummary", data.summary);
+                  }
+                } catch (e) {}
+                setLoading(false);
+              }}
+              className="px-4 py-2 bg-black text-white rounded-lg hover:bg-black/90 flex items-center gap-2 text-sm font-medium transition-colors duration-200 hover:shadow-sm font-reckless"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <svg
+                    className="animate-spin h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  <span>Generating...</span>
+                </>
+              ) : (
+                "Generate Insights"
+              )}
+            </button>
           </div>
         )}
       </div>
