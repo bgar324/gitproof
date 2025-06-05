@@ -108,21 +108,22 @@ export default function ReadmeStatus({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={generateReadme}
-                  disabled={isGenerating}
-                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isGenerating ? (
-                    <>
-                      <FiRefreshCw className="animate-spin -ml-1 mr-1.5 h-3.5 w-3.5" />
-                      Generating...
-                    </>
-                  ) : (
-                    "Generate README"
-                  )}
-                </button>
-                {generatedReadme && (
+                {!generatedReadme ? (
+                  <button
+                    onClick={generateReadme}
+                    disabled={isGenerating}
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <FiRefreshCw className="animate-spin -ml-1 mr-1.5 h-3.5 w-3.5" />
+                        Generating...
+                      </>
+                    ) : (
+                      "Generate README"
+                    )}
+                  </button>
+                ) : (
                   <button
                     onClick={() => setIsPreviewOpen(true)}
                     className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"

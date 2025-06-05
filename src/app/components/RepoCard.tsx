@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import ReadmePreview from "./ReadmePreview";
 import ReadmeStatus from "./ReadmeStatus";
-import { marked } from "marked";
+// import { marked } from "marked";
 import { GitHubRepo } from "../../types/github";
 import Image from "next/image";
 import { FiAlertTriangle, FiTrash2 } from "react-icons/fi";
-import { Sparkle } from "lucide-react";
+// import { Sparkle } from "lucide-react";
+import { IoSparkles } from "react-icons/io5";
 
 function decodeBase64Utf8(base64: any) {
   const binary = atob(base64);
@@ -255,7 +256,7 @@ export default function RepoCard({ repo, session }: RepoCardProps) {
                 className="text-yellow-500 hover:text-yellow-600 transition-colors p-1 rounded focus:outline-none"
                 title="Generate AI Summary"
               >
-                <Sparkle className={`w-4 h-4 ${isLoadingAiSummary ? "animate-spin" : ""}`} />
+                <IoSparkles className={`w-4 h-4 ${isLoadingAiSummary ? "animate-spin" : ""}`} />
               </button>
               {aiSummary && (
                 <button
