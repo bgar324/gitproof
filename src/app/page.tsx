@@ -318,7 +318,9 @@ export default function Home() {
 
             <div className="mt-12 pt-8 border-t border-gray-800">
               <p className="text-center text-gray-400 text-sm">
-                &copy; {new Date().getFullYear()} <span className="font-reckless">Git Proof.</span> All rights reserved.
+                &copy; {new Date().getFullYear()}{" "}
+                <span className="font-reckless">Git Proof.</span> All rights
+                reserved.
               </p>
             </div>
           </div>
