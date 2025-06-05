@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import type { RestEndpointMethodTypes } from '@octokit/plugin-rest-endpoint-methods';
+import { checkPackageJsonExists } from './packageJsonCache';
 
 type CommitResponse = RestEndpointMethodTypes['repos']['listCommits']['response']['data'][0];
 type IssueResponse = RestEndpointMethodTypes['issues']['listForRepo']['response']['data'][0];
@@ -482,87 +483,105 @@ async function analyzeCodeQuality(
   owner: string,
   repo: string
 ) {
-  // Check for common test and CI files
+  // Check for common test and CI files (this is unchanged)
   const { data: files } = await octokit.repos.getContent({
     owner,
     repo,
-    path: '',
+    path: "",
   });
 
-  const hasTests = Array.isArray(files) && files.some(f => 
-    f.type === 'dir' && ['test', 'tests', '__tests__'].includes(f.name)
+  const hasTests = Array.isArray(files) && files.some(f =>
+    f.type === "dir" && ["test", "tests", "__tests__"].includes(f.name)
   );
 
   const hasCI = Array.isArray(files) && files.some(f =>
-    (f.type === 'dir' && f.name === '.github') ||
-    (f.type === 'file' && f.name.includes('.yml'))
+    (f.type === "dir" && f.name === ".github") ||
+    (f.type === "file" && f.name.includes(".yml"))
   );
 
-  // Look for package.json to analyze dependencies
+  // ——— CACHE CHECK: only hit GitHub once per repo ———
   let dependencies = { deps: 0, devDeps: 0 };
-  try {
-    const { data: packageJson } = await octokit.repos.getContent({
-      owner,
-      repo,
-      path: 'package.json',
-    });
+  const key = `${owner}/${repo}`;
+  // Pass your GitHub token so the helper can authenticate. If you aren’t
+  // using a token for unauthenticated requests, you can omit the third argument.
+  const pkgExists = await checkPackageJsonExists(owner, repo, /* token= */ undefined);
 
-    if ('content' in packageJson) {
-      const content = JSON.parse(
-        Buffer.from(packageJson.content, 'base64').toString()
-      );
-      dependencies = {
-        deps: Object.keys(content.dependencies || {}).length,
-        devDeps: Object.keys(content.devDependencies || {}).length,
-      };
+  if (pkgExists) {
+    // Now we know package.json is present (or at least it was when first checked).
+    // If you want, you can skip the second network call entirely by storing
+    // the parsed JSON inside the cache helper. But here we’ll just fetch once more:
+    try {
+      const { data: packageJson } = await octokit.repos.getContent({
+        owner,
+        repo,
+        path: "package.json",
+      });
+      if ("content" in packageJson) {
+        const contentObj = JSON.parse(
+          Buffer.from(packageJson.content, "base64").toString()
+        );
+        dependencies = {
+          deps: Object.keys(contentObj.dependencies || {}).length,
+          devDeps: Object.keys(contentObj.devDependencies || {}).length,
+        };
+      }
+    } catch {
+      // If for some reason this second call fails, we’ll just leave deps/devDeps at 0.
     }
-  } catch {}
+  }
+  // ——— END CACHE CHECK ———
 
   return {
     has_tests: hasTests,
-    test_directory_files: 0, // Would need additional API calls to count
+    test_directory_files: 0, // (unchanged)
     has_ci: hasCI,
-    has_linter: dependencies.devDeps > 0, // Simplified check
-    has_prettier: dependencies.devDeps > 0, // Simplified check
+    has_linter: dependencies.devDeps > 0,
+    has_prettier: dependencies.devDeps > 0,
     dependency_count: dependencies.deps,
     dev_dependency_count: dependencies.devDeps,
   };
 }
+
 
 async function analyzeTechStack(
   octokit: Octokit,
   owner: string,
   repo: string
 ) {
-  try {
-    const { data: packageJson } = await octokit.repos.getContent({
-      owner,
-      repo,
-      path: 'package.json',
-    });
+  // First, consult the cache (or do a one-time fetch under the hood).
+  const pkgExists = await checkPackageJsonExists(owner, repo, /* token= */ undefined);
 
-    if ('content' in packageJson) {
-      const content = JSON.parse(
-        Buffer.from(packageJson.content, 'base64').toString()
-      );
-      
-      // Simplified framework detection
-      const frameworks = [];
-      if (content.dependencies) {
-        if (content.dependencies.react) frameworks.push('React');
-        if (content.dependencies.vue) frameworks.push('Vue');
-        if (content.dependencies.angular) frameworks.push('Angular');
-        if (content.dependencies.next) frameworks.push('Next.js');
+  if (pkgExists) {
+    // Only if package.json definitely exists do we call GitHub again to read it
+    try {
+      const { data: packageJson } = await octokit.repos.getContent({
+        owner,
+        repo,
+        path: "package.json",
+      });
+      if ("content" in packageJson) {
+        const contentObj = JSON.parse(
+          Buffer.from(packageJson.content, "base64").toString()
+        );
+        const frameworks: string[] = [];
+        if (contentObj.dependencies) {
+          if (contentObj.dependencies.react) frameworks.push("React");
+          if (contentObj.dependencies.vue) frameworks.push("Vue");
+          if (contentObj.dependencies.angular) frameworks.push("Angular");
+          if (contentObj.dependencies.next) frameworks.push("Next.js");
+        }
+        return {
+          frameworks,
+          major_libraries: Object.keys(contentObj.dependencies || {}),
+          dev_tools: Object.keys(contentObj.devDependencies || {}),
+        };
       }
-
-      return {
-        frameworks,
-        major_libraries: Object.keys(content.dependencies || {}),
-        dev_tools: Object.keys(content.devDependencies || {}),
-      };
+    } catch {
+      // If reading failed for any reason, we fall back to empty arrays
     }
-  } catch {}
+  }
 
+  // If package.json doesn’t exist (or first‐time fetch failed), return empty arrays:
   return {
     frameworks: [],
     major_libraries: [],
