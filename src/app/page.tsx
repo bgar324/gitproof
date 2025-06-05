@@ -90,7 +90,7 @@ export default function Home() {
               <div className="flex flex-row gap-2 mx-auto">
                 <GitHubSignIn />
                 <a
-                  href="#features"
+                  href="#problem"
                   className="group relative flex items-center justify-center gap-3 rounded-lg bg-white hover:bg-gray-50 px-8 py-4 text-black text-lg font-medium transition-all hover:shadow-lg hover:-translate-y-0.5 font-reckless border"
                 >
                   {/* <svg

@@ -287,12 +287,12 @@ const ExportModal: React.FC<ExportModalProps> = ({
         <div className="w-full max-w-2xl mx-auto rounded-2xl shadow-xl bg-white/80 backdrop-blur-lg border border-gray-200 relative flex flex-col min-h-[520px] max-h-[88vh]">
           <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-gray-900 font-reckless">
                 Export Portfolio
               </h2>
-              <span className="text-xs font-medium text-gray-500 ml-11 mt-0.5">
+              {/* <span className="text-xs font-medium text-gray-500 ml-11 mt-0.5">
                 Export PDF
-              </span>
+              </span> */}
             </div>
             <button
               onClick={onClose}

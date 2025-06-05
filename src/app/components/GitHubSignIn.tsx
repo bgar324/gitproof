@@ -3,34 +3,36 @@
 import { useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 export default function GitHubSignIn() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // 1) If the session is loading, do nothing yet.
-  // 2) As soon as we see `session` is non‐null, push to /dashboard.
   useEffect(() => {
     if (status === "authenticated") {
       router.push("/dashboard");
     }
   }, [status, router]);
 
-  // While NextAuth is checking session, we can show a loading state or null.
   if (status === "loading") {
     return (
-      <div className="flex items-center justify-center">
-        <p>Loading…</p>
+      <div className="flex items-center justify-center h-16">
+        <button
+          disabled
+          className="flex items-center justify-center gap-3 rounded-lg bg-[#2A3442] px-8 py-4 text-white text-lg font-medium opacity-75 cursor-not-allowed"
+        >
+          <Loader2 className="animate-spin w-6 h-6" />
+          <span>Loading…</span>
+        </button>
       </div>
     );
   }
 
-  // If already signed in, we’ll redirect above; but if not, show the button.
   return (
     <div className="flex flex-col items-center justify-center gap-6">
       <button
         onClick={() =>
-          // Directly call next-auth's `signIn("github", { callbackUrl: "/dashboard" })`
           signIn("github", { callbackUrl: "/dashboard" })
         }
         className="group relative flex items-center justify-center gap-3 rounded-lg bg-[#2A3442] hover:bg-[#24292F] px-8 py-4 text-white text-lg font-medium transition-all hover:shadow-lg hover:-translate-y-0.5 font-reckless"
